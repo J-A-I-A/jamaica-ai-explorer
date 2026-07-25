@@ -20,7 +20,7 @@ const TOPICS = [
   "The website itself",
 ] as const;
 
-const LIMITS = { name: 120, email: 160, message: 5000 };
+const LIMITS = { name: 120, email: 160, organisation: 160, message: 5000 };
 
 function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -98,6 +98,7 @@ export async function POST(req: Request) {
   }
 
   const name = str(b.name, LIMITS.name);
+  const organisation = str(b.organisation, LIMITS.organisation);
   const email = str(b.email, LIMITS.email);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return Response.json(
@@ -123,6 +124,7 @@ export async function POST(req: Request) {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
     name: name || null,
+    organisation: organisation || null,
     email: email || null,
     topic,
     message,

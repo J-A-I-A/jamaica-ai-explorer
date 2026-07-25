@@ -34,6 +34,7 @@ declare global {
 export default function FeedbackForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [organisation, setOrganisation] = useState("");
   const [topic, setTopic] = useState(TOPICS[0]);
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">(
@@ -146,6 +147,7 @@ export default function FeedbackForm() {
         body: JSON.stringify({
           name,
           email,
+          organisation,
           topic,
           message,
           recaptchaToken: tokenRef.current,
@@ -183,6 +185,7 @@ export default function FeedbackForm() {
           onClick={() => {
             setName("");
             setEmail("");
+            setOrganisation("");
             setTopic(TOPICS[0]);
             setMessage("");
             setStatus("idle");
@@ -227,6 +230,19 @@ export default function FeedbackForm() {
           />
         </label>
       </div>
+
+      <label className="mt-5 block">
+        <span className="text-sm text-jm-text">Organisation / Company</span>
+        <span className="ml-1 text-xs text-jm-muted">(optional)</span>
+        <input
+          type="text"
+          value={organisation}
+          onChange={(e) => setOrganisation(e.target.value)}
+          maxLength={160}
+          placeholder="Your organisation or company"
+          className={`mt-2 ${fieldClass}`}
+        />
+      </label>
 
       <label className="mt-5 block">
         <span className="text-sm text-jm-text">Topic</span>
