@@ -1,0 +1,261 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --jm-black: #0b0b0c;
+  --jm-ink: #131417;
+  --jm-panel: #1a1c20;
+  --jm-line: #2b2e34;
+  --jm-gold: #ffb400;
+  --jm-gold-soft: #ffd166;
+  --jm-green: #009b3a;
+  --jm-green-soft: #38d17a;
+  --jm-text: #f2f1ee;
+  --jm-muted: #a3a6ad;
+}
+
+/* Light theme — opt-in via data-theme on <html>.
+   Gold becomes a deep amber so it stays readable as text on light
+   surfaces, while cream "ink" text keeps contrast on amber buttons. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --jm-black: #f4f2ec;
+  --jm-ink: #ffffff;
+  --jm-panel: #eae7df;
+  --jm-line: #e0ddd3;
+  --jm-gold: #8a6100;
+  --jm-gold-soft: #a06f00;
+  --jm-green: #007a2e;
+  --jm-green-soft: #0a8a3f;
+  --jm-text: #16181c;
+  --jm-muted: #5c6068;
+}
+
+@theme inline {
+  --color-jm-black: var(--jm-black);
+  --color-jm-ink: var(--jm-ink);
+  --color-jm-panel: var(--jm-panel);
+  --color-jm-line: var(--jm-line);
+  --color-jm-gold: var(--jm-gold);
+  --color-jm-gold-soft: var(--jm-gold-soft);
+  --color-jm-green: var(--jm-green);
+  --color-jm-green-soft: var(--jm-green-soft);
+  --color-jm-text: var(--jm-text);
+  --color-jm-muted: var(--jm-muted);
+  --font-sans: var(--font-sans-var);
+  --font-display: var(--font-display-var);
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+
+body {
+  background-color: var(--jm-black);
+  color: var(--jm-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--jm-gold);
+  color: var(--jm-black);
+}
+
+.flag-rule {
+  /* Fixed Jamaican-flag brand colors so the accent stays vibrant in both themes. */
+  background: linear-gradient(
+    90deg,
+    #009b3a 0%,
+    #009b3a 33%,
+    #ffb400 33%,
+    #ffb400 66%,
+    #009b3a 66%
+  );
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(255, 180, 0, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 180, 0, 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+.chevron {
+  transition: transform 0.2s ease;
+}
+
+.chevron[data-open="true"] {
+  transform: rotate(90deg);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-up {
+  animation: fade-up 0.35s ease both;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--jm-gold);
+  outline-offset: 2px;
+}
+
+/* reCAPTCHA v2 checkbox: clip Google's fixed light-grey anchor border + shadow
+   (they live inside the widget iframe and can't be restyled) so the box blends
+   into the dark form. overflow:hidden crops the outer edges the negative margin
+   pushes past the frame; the dark background keeps the clipped corners from
+   flashing white. */
+.recaptcha-frame {
+  overflow: hidden;
+  border-radius: 4px;
+  width: max-content;
+  line-height: 0;
+  background: var(--jm-panel);
+}
+.recaptcha-frame > div {
+  display: inline-block;
+  vertical-align: top;
+  margin: -3px;
+}
+
+/* Rendered Markdown from the A.I. assistant (theme-aware via jm-* tokens). */
+.md-body {
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+.md-body > :first-child {
+  margin-top: 0;
+}
+.md-body > :last-child {
+  margin-bottom: 0;
+}
+.md-body p {
+  margin: 0.6em 0;
+}
+.md-body strong {
+  font-weight: 600;
+  color: var(--jm-text);
+}
+.md-body em {
+  font-style: italic;
+}
+.md-body a {
+  color: var(--jm-gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md-body ul,
+.md-body ol {
+  margin: 0.6em 0;
+  padding-left: 1.35em;
+}
+.md-body ul {
+  list-style: disc;
+}
+.md-body ol {
+  list-style: decimal;
+}
+.md-body li {
+  margin: 0.25em 0;
+}
+.md-body li > ul,
+.md-body li > ol {
+  margin: 0.25em 0;
+}
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4 {
+  font-family: var(--font-display, inherit);
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1em 0 0.4em;
+  color: var(--jm-text);
+}
+.md-body h1 {
+  font-size: 1.35em;
+}
+.md-body h2 {
+  font-size: 1.2em;
+}
+.md-body h3 {
+  font-size: 1.05em;
+}
+.md-body h4 {
+  font-size: 1em;
+}
+.md-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  background: var(--jm-panel);
+  border: 1px solid var(--jm-line);
+  border-radius: 0.3rem;
+  padding: 0.1em 0.35em;
+}
+.md-body pre {
+  margin: 0.7em 0;
+  padding: 0.85rem 1rem;
+  background: var(--jm-panel);
+  border: 1px solid var(--jm-line);
+  border-radius: 0.6rem;
+  overflow-x: auto;
+}
+.md-body pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.85em;
+}
+.md-body blockquote {
+  margin: 0.7em 0;
+  padding: 0.15em 0 0.15em 0.9em;
+  border-left: 3px solid var(--jm-gold);
+  color: var(--jm-muted);
+}
+.md-body hr {
+  margin: 1em 0;
+  border: 0;
+  border-top: 1px solid var(--jm-line);
+}
+.md-table-wrap {
+  margin: 0.8em 0;
+  overflow-x: auto;
+  border: 1px solid var(--jm-line);
+  border-radius: 0.6rem;
+}
+.md-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+.md-body thead {
+  background: var(--jm-panel);
+}
+.md-body th,
+.md-body td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--jm-line);
+  vertical-align: top;
+}
+.md-body th {
+  font-weight: 600;
+  color: var(--jm-text);
+  white-space: nowrap;
+}
+.md-body tbody tr:last-child td {
+  border-bottom: 0;
+}
+.md-body th:not(:last-child),
+.md-body td:not(:last-child) {
+  border-right: 1px solid var(--jm-line);
+}
