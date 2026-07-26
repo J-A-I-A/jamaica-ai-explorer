@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
@@ -18,6 +19,8 @@ export const metadata: Metadata = {
   title: "National A.I. Policy Explorer | Jamaica",
   description:
     "An interactive explorer for the Jamaica National Artificial Intelligence Task Force policy recommendations — 9 policy pillars, a SWOT analysis, and a 10-year action plan.",
+  // Keep the site out of search results while it is unpublished.
+  robots: { index: false, follow: false, nocache: true },
 };
 
 export default function RootLayout({
@@ -44,6 +47,7 @@ export default function RootLayout({
         <SiteHeader />
         <main className="flex-1">{children}</main>
         <SiteFooter />
+        <Analytics />
       </body>
     </html>
   );
