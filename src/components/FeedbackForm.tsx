@@ -51,7 +51,7 @@ export default function FeedbackForm() {
   // Load and render the reCAPTCHA v2 widget when a site key is configured,
   // matching the site theme and re-rendering when the theme is toggled.
   useEffect(() => {
-    if (!SITE_KEY) return;
+    if (!SITE_KEY || !FEEDBACK_SUBMISSIONS_OPEN) return;
     let poll: ReturnType<typeof setInterval> | undefined;
 
     const themeNow = () =>
@@ -370,7 +370,7 @@ export default function FeedbackForm() {
         </p>
       )}
 
-      {SITE_KEY && (
+      {SITE_KEY && FEEDBACK_SUBMISSIONS_OPEN && (
         <div className="mt-6">
           <span className="text-sm text-jm-text">Verification</span>
           <div ref={wrapRef} className="recaptcha-frame mt-2" />
@@ -379,6 +379,13 @@ export default function FeedbackForm() {
 
       {status === "error" && error && (
         <p className="mt-4 text-sm text-jm-gold-soft">{error}</p>
+      )}
+
+      {!FEEDBACK_SUBMISSIONS_OPEN && (
+        <p className="mt-6 rounded-lg border border-jm-line bg-jm-black/40 px-4 py-3 text-sm text-jm-muted">
+          Submissions aren&apos;t open just yet — this form is here so you can
+          see what will be asked. Please check back shortly.
+        </p>
       )}
 
       <div className="mt-6 flex items-center justify-between gap-4">
@@ -391,11 +398,13 @@ export default function FeedbackForm() {
           disabled={status === "sending" || !canSubmit}
           className="shrink-0 rounded-md bg-jm-gold px-5 py-2.5 text-sm font-semibold text-jm-black transition-colors hover:bg-jm-gold-soft disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {status === "sending"
-            ? "Sending…"
-            : entries.length > 1
-              ? `Submit ${entries.length} responses`
-              : "Submit feedback"}
+          {!FEEDBACK_SUBMISSIONS_OPEN
+            ? "Feedback opens soon"
+            : status === "sending"
+              ? "Sending…"
+              : entries.length > 1
+                ? `Submit ${entries.length} responses`
+                : "Submit feedback"}
         </button>
       </div>
     </form>

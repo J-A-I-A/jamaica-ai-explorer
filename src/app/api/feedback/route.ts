@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import {
   FEEDBACK_TOPICS,
   FEEDBACK_LIMITS as LIMITS,
+  FEEDBACK_SUBMISSIONS_OPEN,
   MAX_FEEDBACK_ENTRIES,
   RESPONDENT_TYPES,
 } from "@/data/feedback";
@@ -80,6 +81,13 @@ async function sendToGoogleSheets(entry: Record<string, unknown>) {
 }
 
 export async function POST(req: Request) {
+  if (!FEEDBACK_SUBMISSIONS_OPEN) {
+    return Response.json(
+      { error: "Feedback isn't open just yet. Please check back shortly." },
+      { status: 503 },
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
