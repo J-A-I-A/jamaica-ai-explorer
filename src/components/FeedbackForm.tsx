@@ -5,6 +5,7 @@ import {
   FEEDBACK_TOPICS,
   FEEDBACK_LIMITS,
   MAX_FEEDBACK_ENTRIES,
+  RESPONDENT_TYPES,
 } from "@/data/feedback";
 import { CURRENT_POLICY_STEP, currentPolicyStep } from "@/data/policyTimeline";
 
@@ -32,9 +33,9 @@ declare global {
 }
 
 export default function FeedbackForm() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [organisation, setOrganisation] = useState("");
+  const [respondentType, setRespondentType] = useState<string>(
+    RESPONDENT_TYPES[0],
+  );
   const [entries, setEntries] = useState<Entry[]>(() => [newEntry()]);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">(
     "idle",
@@ -180,9 +181,7 @@ export default function FeedbackForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name,
-          email,
-          organisation,
+          respondentType,
           entries: entries.map((en) => ({
             topics: en.topics,
             message: en.message,
@@ -224,9 +223,7 @@ export default function FeedbackForm() {
         <button
           type="button"
           onClick={() => {
-            setName("");
-            setEmail("");
-            setOrganisation("");
+            setRespondentType(RESPONDENT_TYPES[0]);
             setEntries([newEntry()]);
             setStatus("idle");
             resetCaptcha();
@@ -244,44 +241,25 @@ export default function FeedbackForm() {
       onSubmit={onSubmit}
       className="rounded-xl border border-jm-line bg-jm-ink p-6 sm:p-8"
     >
-      <div className="grid gap-5 sm:grid-cols-2">
-        <label className="block">
-          <span className="text-sm text-jm-text">Name</span>
-          <span className="ml-1 text-xs text-jm-muted">(optional)</span>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={FEEDBACK_LIMITS.name}
-            placeholder="Your name"
-            className={`mt-2 ${fieldClass}`}
-          />
-        </label>
-        <label className="block">
-          <span className="text-sm text-jm-text">Email</span>
-          <span className="ml-1 text-xs text-jm-muted">(optional)</span>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            maxLength={FEEDBACK_LIMITS.email}
-            placeholder="you@example.com"
-            className={`mt-2 ${fieldClass}`}
-          />
-        </label>
-      </div>
-
-      <label className="mt-5 block">
-        <span className="text-sm text-jm-text">Organisation / Company</span>
-        <span className="ml-1 text-xs text-jm-muted">(optional)</span>
-        <input
-          type="text"
-          value={organisation}
-          onChange={(e) => setOrganisation(e.target.value)}
-          maxLength={FEEDBACK_LIMITS.organisation}
-          placeholder="Your organisation or company"
+      <label className="block sm:max-w-sm">
+        <span className="text-sm text-jm-text">
+          I&apos;m sharing this feedback as
+        </span>
+        <select
+          value={respondentType}
+          onChange={(e) => setRespondentType(e.target.value)}
           className={`mt-2 ${fieldClass}`}
-        />
+        >
+          {RESPONDENT_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <span className="mt-2 block text-xs text-jm-muted">
+          No personal details are collected — your feedback is submitted
+          anonymously.
+        </span>
       </label>
 
       <div className="mt-8 border-t border-jm-line pt-6">

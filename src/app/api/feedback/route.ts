@@ -5,6 +5,7 @@ import {
   FEEDBACK_TOPICS,
   FEEDBACK_LIMITS as LIMITS,
   MAX_FEEDBACK_ENTRIES,
+  RESPONDENT_TYPES,
 } from "@/data/feedback";
 import { CURRENT_POLICY_STEP, currentPolicyStep } from "@/data/policyTimeline";
 
@@ -118,15 +119,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const name = str(b.name, LIMITS.name);
-  const organisation = str(b.organisation, LIMITS.organisation);
-  const email = str(b.email, LIMITS.email);
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return Response.json(
-      { error: "That email address doesn't look valid." },
-      { status: 400 },
-    );
-  }
+  const rawType = str(b.respondentType, 80);
+  const respondentType = (RESPONDENT_TYPES as readonly string[]).includes(
+    rawType,
+  )
+    ? rawType
+    : RESPONDENT_TYPES[0];
 
   // Verify reCAPTCHA before doing anything else.
   const ip =
@@ -147,9 +145,7 @@ export async function POST(req: Request) {
     entryIndex: i + 1,
     entryCount: parsed.length,
     createdAt,
-    name: name || null,
-    organisation: organisation || null,
-    email: email || null,
+    respondentType,
     // `topic` stays a single string so existing spreadsheet columns keep working.
     topic: e.topics.join(", "),
     topics: e.topics,

@@ -16,12 +16,14 @@ export const FEEDBACK_TOPICS = [
 
 export type FeedbackTopic = (typeof FEEDBACK_TOPICS)[number];
 
+/** Who is speaking. The form collects nothing else about the respondent. */
+export const RESPONDENT_TYPES = ["Individual", "Organisation / Company"] as const;
+
+export type RespondentType = (typeof RESPONDENT_TYPES)[number];
+
 /** How many separate pieces of feedback one submission may carry. */
 export const MAX_FEEDBACK_ENTRIES = 10;
 
 export const FEEDBACK_LIMITS = {
-  name: 120,
-  email: 160,
-  organisation: 160,
   message: 5000,
 };
