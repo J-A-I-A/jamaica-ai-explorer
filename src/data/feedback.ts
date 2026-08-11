@@ -16,6 +16,13 @@ export const FEEDBACK_TOPICS = [
 
 export type FeedbackTopic = (typeof FEEDBACK_TOPICS)[number];
 
+/**
+ * Master switch for accepting submissions. While this is `false` the form
+ * still renders (so people can read it) but the submit button is disabled and
+ * the API rejects posts. Flip to `true` to open feedback.
+ */
+export const FEEDBACK_SUBMISSIONS_OPEN = false;
+
 /** Who is speaking. The form collects nothing else about the respondent. */
 export const RESPONDENT_TYPES = ["Individual", "Organisation / Company"] as const;
 

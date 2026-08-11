@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   FEEDBACK_TOPICS,
   FEEDBACK_LIMITS,
+  FEEDBACK_SUBMISSIONS_OPEN,
   MAX_FEEDBACK_ENTRIES,
   RESPONDENT_TYPES,
 } from "@/data/feedback";
@@ -162,7 +163,10 @@ export default function FeedbackForm() {
     );
   }
 
-  const canSubmit = entries.length > 0 && entries.every(entryIsValid);
+  const canSubmit =
+    FEEDBACK_SUBMISSIONS_OPEN &&
+    entries.length > 0 &&
+    entries.every(entryIsValid);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
