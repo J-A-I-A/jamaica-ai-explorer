@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
+import FeedbackCta from "@/components/FeedbackCta";
 
 const sans = Inter({
   variable: "--font-sans-var",
@@ -46,6 +47,7 @@ export default function RootLayout({
       >
         <SiteHeader />
         <main className="flex-1">{children}</main>
+        <FeedbackCta />
         <SiteFooter />
         <Analytics />
       </body>

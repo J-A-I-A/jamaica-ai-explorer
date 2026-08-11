@@ -22,6 +22,12 @@ export default function SiteFooter() {
             <li><Link className="hover:text-jm-text" href="/swot">SWOT analysis</Link></li>
             <li><Link className="hover:text-jm-text" href="/ethics">Ethical considerations</Link></li>
             <li><Link className="hover:text-jm-text" href="/task-force">The Task Force</Link></li>
+            <li><Link className="hover:text-jm-text" href="/assistant">Smart Search</Link></li>
+            <li>
+              <Link className="font-medium text-jm-gold hover:text-jm-gold-soft" href="/feedback">
+                Share your feedback →
+              </Link>
+            </li>
           </ul>
         </div>
 

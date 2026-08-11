@@ -12,8 +12,11 @@ const NAV = [
   { href: "/ethics", label: "Ethics" },
   { href: "/task-force", label: "Task Force" },
   { href: "/assistant", label: "Smart Search" },
-  { href: "/feedback", label: "Feedback" },
 ];
+
+// Feedback sits outside NAV: it is the site's primary call to action and is
+// rendered as a button that stays visible even when the menu is collapsed.
+const FEEDBACK_HREF = "/feedback";
 
 export default function SiteHeader() {
   const pathname = usePathname();
@@ -61,6 +64,18 @@ export default function SiteHeader() {
               );
             })}
           </nav>
+
+          <Link
+            href={FEEDBACK_HREF}
+            aria-current={pathname === FEEDBACK_HREF ? "page" : undefined}
+            className="inline-flex items-center gap-1.5 rounded-md bg-jm-gold px-3 py-2 text-xs font-semibold text-jm-black transition-colors hover:bg-jm-gold-soft sm:text-sm md:ml-2 md:px-4"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.9-.9L3 20.5l1.5-4.4A8.4 8.4 0 013.6 11.5a8.4 8.4 0 018.4-8.4h.5a8.4 8.4 0 018.5 8.4z" />
+            </svg>
+            <span className="hidden sm:inline">Share your feedback</span>
+            <span className="sm:hidden">Feedback</span>
+          </Link>
 
           <ThemeToggle />
 

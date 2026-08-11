@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PILLARS, COUNTS, VISION, HORIZONS } from "@/data/recommendations";
 import { GLOBAL_THEMES } from "@/data/context";
+import { CURRENT_POLICY_STEP, POLICY_TIMELINE } from "@/data/policyTimeline";
 import { Eyebrow, PillarIcon } from "@/components/ui";
 
 export default function Home() {
@@ -21,9 +22,19 @@ export default function Home() {
         />
 
         <div className="relative mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28">
-          <div className="inline-flex items-center gap-2 rounded-full border border-jm-line bg-jm-panel/60 px-3 py-1 text-xs text-jm-muted">
-            <span className="h-1.5 w-1.5 rounded-full bg-jm-green-soft" />
-            Presented to the Office of the Prime Minister
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-jm-line bg-jm-panel/60 px-3 py-1 text-xs text-jm-muted">
+              <span className="h-1.5 w-1.5 rounded-full bg-jm-green-soft" />
+              Presented to the Office of the Prime Minister
+            </div>
+            <Link
+              href="/feedback"
+              className="inline-flex items-center gap-2 rounded-full border border-jm-gold/40 bg-jm-gold/10 px-3 py-1 text-xs font-medium text-jm-gold-soft transition-colors hover:bg-jm-gold/20"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-jm-gold" />
+              Open for public feedback — Step {CURRENT_POLICY_STEP} of{" "}
+              {POLICY_TIMELINE.length}
+            </Link>
           </div>
 
           <h1 className="mt-6 max-w-4xl font-display text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
@@ -35,7 +46,8 @@ export default function Home() {
             The National Artificial Intelligence Task Force set out {COUNTS.pillars} policy pillars
             and {COUNTS.actions} SMART recommendations to position Jamaica at the forefront of
             global digital transformation — while responsibly managing the risks. Filter, search and
-            trace every recommendation across a ten-year horizon.
+            trace every recommendation across a ten-year horizon — then tell the Task Force what you
+            think.
           </p>
 
           <div className="mt-9 flex flex-wrap gap-3">
@@ -44,6 +56,15 @@ export default function Home() {
               className="rounded-md bg-jm-gold px-5 py-3 text-sm font-semibold text-jm-black transition-colors hover:bg-jm-gold-soft"
             >
               Explore the recommendations
+            </Link>
+            <Link
+              href="/feedback"
+              className="inline-flex items-center gap-2 rounded-md bg-jm-green px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-jm-green-soft hover:text-jm-black"
+            >
+              Share your feedback
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
             </Link>
             <Link
               href="/roadmap"
