@@ -11,7 +11,7 @@ const NAV = [
   { href: "/swot", label: "SWOT" },
   { href: "/ethics", label: "Ethics" },
   { href: "/task-force", label: "Task Force" },
-  { href: "/assistant", label: "Ask A.I." },
+  { href: "/assistant", label: "Smart Search" },
   { href: "/feedback", label: "Feedback" },
 ];
 

@@ -1,25 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-
-const TOPICS = [
-  "General",
-  "Innovation & Economic Growth",
-  "Education & Workforce",
-  "Public Awareness",
-  "Infrastructure",
-  "International Cooperation",
-  "Legal & Regulatory",
-  "Government & Industry",
-  "Ethical Foundations",
-  "Cohesive Framework",
-  "The website itself",
-];
+import {
+  FEEDBACK_TOPICS,
+  FEEDBACK_LIMITS,
+  MAX_FEEDBACK_ENTRIES,
+} from "@/data/feedback";
+import { CURRENT_POLICY_STEP, currentPolicyStep } from "@/data/policyTimeline";
 
 const SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
 
 const fieldClass =
   "w-full rounded-lg border border-jm-line bg-jm-black px-3.5 py-2.5 text-sm text-jm-text placeholder:text-jm-muted/60 focus:border-jm-gold/50";
+
+type Entry = { id: number; topics: string[]; message: string };
+
+let idSeq = 0;
+const newEntry = (): Entry => ({ id: ++idSeq, topics: [], message: "" });
+
+const entryIsValid = (e: Entry) =>
+  e.message.trim().length >= 2 && e.topics.length > 0;
 
 declare global {
   interface Window {
@@ -35,12 +35,12 @@ export default function FeedbackForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [organisation, setOrganisation] = useState("");
-  const [topic, setTopic] = useState(TOPICS[0]);
-  const [message, setMessage] = useState("");
+  const [entries, setEntries] = useState<Entry[]>(() => [newEntry()]);
   const [status, setStatus] = useState<"idle" | "sending" | "done" | "error">(
     "idle",
   );
   const [error, setError] = useState<string | null>(null);
+  const [sent, setSent] = useState(0);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const widgetId = useRef<number | null>(null);
@@ -128,9 +128,44 @@ export default function FeedbackForm() {
     tokenRef.current = null;
   }
 
+  function updateEntry(id: number, patch: Partial<Entry>) {
+    setEntries((list) =>
+      list.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+    );
+  }
+
+  function toggleTopic(id: number, topic: string) {
+    setEntries((list) =>
+      list.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              topics: e.topics.includes(topic)
+                ? e.topics.filter((t) => t !== topic)
+                : [...e.topics, topic],
+            }
+          : e,
+      ),
+    );
+  }
+
+  function addEntry() {
+    setEntries((list) =>
+      list.length >= MAX_FEEDBACK_ENTRIES ? list : [...list, newEntry()],
+    );
+  }
+
+  function removeEntry(id: number) {
+    setEntries((list) =>
+      list.length === 1 ? list : list.filter((e) => e.id !== id),
+    );
+  }
+
+  const canSubmit = entries.length > 0 && entries.every(entryIsValid);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (status === "sending") return;
+    if (status === "sending" || !canSubmit) return;
 
     if (SITE_KEY && !tokenRef.current) {
       setStatus("error");
@@ -148,8 +183,10 @@ export default function FeedbackForm() {
           name,
           email,
           organisation,
-          topic,
-          message,
+          entries: entries.map((en) => ({
+            topics: en.topics,
+            message: en.message,
+          })),
           recaptchaToken: tokenRef.current,
         }),
       });
@@ -157,6 +194,7 @@ export default function FeedbackForm() {
         const data = await res.json().catch(() => null);
         throw new Error(data?.error ?? "Something went wrong. Please try again.");
       }
+      setSent(entries.length);
       setStatus("done");
     } catch (err) {
       setStatus("error");
@@ -177,8 +215,11 @@ export default function FeedbackForm() {
           Thank you for your feedback
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-jm-muted">
-          Your input has been recorded and helps shape how Jamaica&apos;s A.I.
-          policy is understood and improved.
+          {sent === 1
+            ? "Your response has been recorded"
+            : `All ${sent} of your responses have been recorded`}{" "}
+          against Step {CURRENT_POLICY_STEP} — {currentPolicyStep.title}. Public
+          input shapes how Jamaica&apos;s A.I. policy is understood and improved.
         </p>
         <button
           type="button"
@@ -186,8 +227,7 @@ export default function FeedbackForm() {
             setName("");
             setEmail("");
             setOrganisation("");
-            setTopic(TOPICS[0]);
-            setMessage("");
+            setEntries([newEntry()]);
             setStatus("idle");
             resetCaptcha();
           }}
@@ -212,7 +252,7 @@ export default function FeedbackForm() {
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            maxLength={120}
+            maxLength={FEEDBACK_LIMITS.name}
             placeholder="Your name"
             className={`mt-2 ${fieldClass}`}
           />
@@ -224,7 +264,7 @@ export default function FeedbackForm() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            maxLength={160}
+            maxLength={FEEDBACK_LIMITS.email}
             placeholder="you@example.com"
             className={`mt-2 ${fieldClass}`}
           />
@@ -238,45 +278,118 @@ export default function FeedbackForm() {
           type="text"
           value={organisation}
           onChange={(e) => setOrganisation(e.target.value)}
-          maxLength={160}
+          maxLength={FEEDBACK_LIMITS.organisation}
           placeholder="Your organisation or company"
           className={`mt-2 ${fieldClass}`}
         />
       </label>
 
-      <label className="mt-5 block">
-        <span className="text-sm text-jm-text">Topic</span>
-        <select
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          className={`mt-2 ${fieldClass}`}
-        >
-          {TOPICS.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="mt-8 border-t border-jm-line pt-6">
+        <p className="text-sm text-jm-text">Your feedback</p>
+        <p className="mt-1 text-xs leading-relaxed text-jm-muted">
+          Add as many separate pieces of feedback as you like — each one can
+          cover several topic areas. All of them are recorded against Step{" "}
+          {CURRENT_POLICY_STEP} ({currentPolicyStep.title}) of the policy
+          timeline.
+        </p>
+      </div>
 
-      <label className="mt-5 block">
-        <span className="text-sm text-jm-text">Your feedback</span>
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          required
-          rows={6}
-          maxLength={5000}
-          placeholder="Share your thoughts, questions, or concerns about the A.I. policy recommendations…"
-          className={`mt-2 resize-y ${fieldClass}`}
-        />
-        <span className="mt-1 block text-right text-xs text-jm-muted">
-          {message.length}/5000
-        </span>
-      </label>
+      <div className="mt-5 space-y-5">
+        {entries.map((entry, i) => (
+          <fieldset
+            key={entry.id}
+            className="rounded-xl border border-jm-line bg-jm-black/40 p-5"
+          >
+            <legend className="sr-only">Feedback {i + 1}</legend>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-[11px] uppercase tracking-[0.18em] text-jm-gold">
+                Feedback {i + 1}
+              </span>
+              {entries.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeEntry(entry.id)}
+                  className="rounded-md px-2 py-1 text-xs text-jm-muted transition-colors hover:bg-jm-panel hover:text-jm-text"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+
+            <div className="mt-4">
+              <span className="text-sm text-jm-text">Topic areas</span>
+              <span className="ml-1 text-xs text-jm-muted">
+                (select one or more)
+              </span>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {FEEDBACK_TOPICS.map((t) => {
+                  const on = entry.topics.includes(t);
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggleTopic(entry.id, t)}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                        on
+                          ? "border-jm-gold/50 bg-jm-gold/15 text-jm-gold-soft"
+                          : "border-jm-line bg-jm-black text-jm-muted hover:border-jm-gold/40 hover:text-jm-text"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <label className="mt-4 block">
+              <span className="sr-only">Feedback {i + 1} message</span>
+              <textarea
+                value={entry.message}
+                onChange={(e) =>
+                  updateEntry(entry.id, { message: e.target.value })
+                }
+                required
+                rows={5}
+                maxLength={FEEDBACK_LIMITS.message}
+                placeholder="Share your thoughts, questions, or concerns about the A.I. policy recommendations…"
+                className={`resize-y ${fieldClass}`}
+              />
+              <span className="mt-1 block text-right text-xs text-jm-muted">
+                {entry.message.length}/{FEEDBACK_LIMITS.message}
+              </span>
+            </label>
+
+            {entry.message.trim().length >= 2 && entry.topics.length === 0 && (
+              <p className="mt-1 text-xs text-jm-gold-soft">
+                Pick at least one topic area for this feedback.
+              </p>
+            )}
+          </fieldset>
+        ))}
+      </div>
+
+      {entries.length < MAX_FEEDBACK_ENTRIES ? (
+        <button
+          type="button"
+          onClick={addEntry}
+          className="mt-4 inline-flex items-center gap-2 rounded-md border border-dashed border-jm-line px-4 py-2.5 text-sm text-jm-muted transition-colors hover:border-jm-gold/50 hover:text-jm-text"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Add another piece of feedback
+        </button>
+      ) : (
+        <p className="mt-4 text-xs text-jm-muted">
+          That&apos;s the maximum of {MAX_FEEDBACK_ENTRIES} per submission — send
+          these first, then add more.
+        </p>
+      )}
 
       {SITE_KEY && (
-        <div className="mt-5">
+        <div className="mt-6">
           <span className="text-sm text-jm-text">Verification</span>
           <div ref={wrapRef} className="recaptcha-frame mt-2" />
         </div>
@@ -293,10 +406,14 @@ export default function FeedbackForm() {
         </p>
         <button
           type="submit"
-          disabled={status === "sending" || message.trim().length < 2}
+          disabled={status === "sending" || !canSubmit}
           className="shrink-0 rounded-md bg-jm-gold px-5 py-2.5 text-sm font-semibold text-jm-black transition-colors hover:bg-jm-gold-soft disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {status === "sending" ? "Sending…" : "Submit feedback"}
+          {status === "sending"
+            ? "Sending…"
+            : entries.length > 1
+              ? `Submit ${entries.length} responses`
+              : "Submit feedback"}
         </button>
       </div>
     </form>

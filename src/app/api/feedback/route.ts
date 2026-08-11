@@ -1,29 +1,27 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import {
+  FEEDBACK_TOPICS,
+  FEEDBACK_LIMITS as LIMITS,
+  MAX_FEEDBACK_ENTRIES,
+} from "@/data/feedback";
+import { CURRENT_POLICY_STEP, currentPolicyStep } from "@/data/policyTimeline";
 
 // Needs the Node.js runtime to write to the filesystem.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const TOPICS = [
-  "General",
-  "Innovation & Economic Growth",
-  "Education & Workforce",
-  "Public Awareness",
-  "Infrastructure",
-  "International Cooperation",
-  "Legal & Regulatory",
-  "Government & Industry",
-  "Ethical Foundations",
-  "Cohesive Framework",
-  "The website itself",
-] as const;
-
-const LIMITS = { name: 120, email: 160, organisation: 160, message: 5000 };
-
 function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
+}
+
+/** Keep only known topics, de-duplicated and in the canonical order. */
+function normaliseTopics(raw: unknown): string[] {
+  const values = Array.isArray(raw) ? raw : [raw];
+  const picked = new Set(values.map((v) => str(v, 80)));
+  const topics = FEEDBACK_TOPICS.filter((t) => picked.has(t));
+  return topics.length > 0 ? topics : ["General"];
 }
 
 // --- reCAPTCHA v2 verification (enforced only when a secret is configured) ---
@@ -89,8 +87,31 @@ export async function POST(req: Request) {
   }
 
   const b = body as Record<string, unknown>;
-  const message = str(b.message, LIMITS.message);
-  if (message.length < 2) {
+
+  // A submission carries one or more pieces of feedback. Older single-entry
+  // payloads (`topic` + `message`) are still accepted.
+  const rawEntries: unknown[] = Array.isArray(b.entries)
+    ? b.entries
+    : [{ topics: b.topics ?? b.topic, message: b.message }];
+
+  if (rawEntries.length > MAX_FEEDBACK_ENTRIES) {
+    return Response.json(
+      { error: `Please send at most ${MAX_FEEDBACK_ENTRIES} pieces of feedback at a time.` },
+      { status: 400 },
+    );
+  }
+
+  const parsed = rawEntries
+    .map((raw) => {
+      const e = (raw ?? {}) as Record<string, unknown>;
+      return {
+        topics: normaliseTopics(e.topics ?? e.topic),
+        message: str(e.message, LIMITS.message),
+      };
+    })
+    .filter((e) => e.message.length >= 2);
+
+  if (parsed.length === 0) {
     return Response.json(
       { error: "Please enter a message before submitting." },
       { status: 400 },
@@ -107,11 +128,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const rawTopic = str(b.topic, 80);
-  const topic = (TOPICS as readonly string[]).includes(rawTopic)
-    ? rawTopic
-    : "General";
-
   // Verify reCAPTCHA before doing anything else.
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined;
@@ -120,15 +136,27 @@ export async function POST(req: Request) {
     return Response.json({ error: captcha.error }, { status: 400 });
   }
 
-  const entry = {
+  // One record per piece of feedback, tied together by a submission id so a
+  // multi-part response can be reassembled, and stamped with the policy stage
+  // it was given at.
+  const submissionId = randomUUID();
+  const createdAt = new Date().toISOString();
+  const entries = parsed.map((e, i) => ({
     id: randomUUID(),
-    createdAt: new Date().toISOString(),
+    submissionId,
+    entryIndex: i + 1,
+    entryCount: parsed.length,
+    createdAt,
     name: name || null,
     organisation: organisation || null,
     email: email || null,
-    topic,
-    message,
-  };
+    // `topic` stays a single string so existing spreadsheet columns keep working.
+    topic: e.topics.join(", "),
+    topics: e.topics,
+    message: e.message,
+    policyStep: CURRENT_POLICY_STEP,
+    policyStage: currentPolicyStep.title,
+  }));
 
   // Local backup log (best-effort — never blocks the submission).
   try {
@@ -136,22 +164,24 @@ export async function POST(req: Request) {
     await fs.mkdir(dir, { recursive: true });
     await fs.appendFile(
       path.join(dir, "feedback.jsonl"),
-      JSON.stringify(entry) + "\n",
+      entries.map((e) => JSON.stringify(e)).join("\n") + "\n",
       "utf8",
     );
   } catch (err) {
     console.error("Failed to write local feedback backup:", err);
   }
 
-  // Deliver to Google Sheets. If configured but it fails, tell the user to
-  // retry (the local backup above still captured their submission).
-  const sheet = await sendToGoogleSheets(entry);
-  if (!sheet.ok) {
-    return Response.json(
-      { error: "We couldn't save your feedback right now. Please try again." },
-      { status: 502 },
-    );
+  // Deliver to Google Sheets, one row per entry. If configured but it fails,
+  // tell the user to retry (the local backup above still captured everything).
+  for (const entry of entries) {
+    const sheet = await sendToGoogleSheets(entry);
+    if (!sheet.ok) {
+      return Response.json(
+        { error: "We couldn't save your feedback right now. Please try again." },
+        { status: 502 },
+      );
+    }
   }
 
-  return Response.json({ ok: true });
+  return Response.json({ ok: true, count: entries.length });
 }
