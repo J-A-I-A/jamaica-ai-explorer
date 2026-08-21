@@ -6,13 +6,25 @@ import {
   FEEDBACK_LIMITS as LIMITS,
   FEEDBACK_SUBMISSIONS_OPEN,
   MAX_FEEDBACK_ENTRIES,
+  MAX_FEEDBACK_RATINGS,
   RESPONDENT_TYPES,
+  SUPPORT_BY_VALUE,
 } from "@/data/feedback";
+import { ALL_ACTIONS, getPillar } from "@/data/recommendations";
 import { CURRENT_POLICY_STEP, currentPolicyStep } from "@/data/policyTimeline";
+import {
+  isDatabaseConfigured,
+  saveFeedback,
+  type FeedbackRatingRecord,
+} from "@/lib/db";
 
 // Needs the Node.js runtime to write to the filesystem.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** Recommendations keyed by id, so a posted rating can only ever refer to a
+ *  recommendation that actually exists in the policy. */
+const ACTIONS_BY_ID = new Map(ALL_ACTIONS.map((a) => [a.id, a]));
 
 function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -53,33 +65,6 @@ async function verifyRecaptcha(token: string, remoteIp?: string) {
   }
 }
 
-// --- Google Sheets delivery via an Apps Script Web App webhook ------------
-async function sendToGoogleSheets(entry: Record<string, unknown>) {
-  const url = process.env.GOOGLE_SHEETS_WEBHOOK_URL;
-  if (!url) return { ok: true as const }; // not configured — skip
-
-  try {
-    const payload: Record<string, unknown> = { ...entry };
-    if (process.env.GOOGLE_SHEETS_WEBHOOK_TOKEN) {
-      payload.secret = process.env.GOOGLE_SHEETS_WEBHOOK_TOKEN;
-    }
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      redirect: "follow",
-    });
-    if (!res.ok) {
-      console.error("Google Sheets webhook returned", res.status);
-      return { ok: false as const };
-    }
-    return { ok: true as const };
-  } catch (err) {
-    console.error("Google Sheets webhook error:", err);
-    return { ok: false as const };
-  }
-}
-
 export async function POST(req: Request) {
   if (!FEEDBACK_SUBMISSIONS_OPEN) {
     return Response.json(
@@ -97,15 +82,18 @@ export async function POST(req: Request) {
 
   const b = body as Record<string, unknown>;
 
-  // A submission carries one or more pieces of feedback. Older single-entry
-  // payloads (`topic` + `message`) are still accepted.
+  // A submission carries per-recommendation ratings from the guided review,
+  // open-ended comments, or both. Older single-entry payloads (`topic` +
+  // `message`) are still accepted.
   const rawEntries: unknown[] = Array.isArray(b.entries)
     ? b.entries
-    : [{ topics: b.topics ?? b.topic, message: b.message }];
+    : b.entries === undefined && (b.message !== undefined || b.topic !== undefined)
+      ? [{ topics: b.topics ?? b.topic, message: b.message }]
+      : [];
 
   if (rawEntries.length > MAX_FEEDBACK_ENTRIES) {
     return Response.json(
-      { error: `Please send at most ${MAX_FEEDBACK_ENTRIES} pieces of feedback at a time.` },
+      { error: `Please send at most ${MAX_FEEDBACK_ENTRIES} comments at a time.` },
       { status: 400 },
     );
   }
@@ -120,9 +108,39 @@ export async function POST(req: Request) {
     })
     .filter((e) => e.message.length >= 2);
 
-  if (parsed.length === 0) {
+  const rawRatings: unknown[] = Array.isArray(b.ratings) ? b.ratings : [];
+  if (rawRatings.length > MAX_FEEDBACK_RATINGS) {
     return Response.json(
-      { error: "Please enter a message before submitting." },
+      { error: "That's more ratings than there are recommendations." },
+      { status: 400 },
+    );
+  }
+
+  // One rating per recommendation; unknown ids and empty skips are dropped.
+  const seen = new Set<string>();
+  const ratings = rawRatings
+    .map((raw) => {
+      const r = (raw ?? {}) as Record<string, unknown>;
+      const action = ACTIONS_BY_ID.get(str(r.actionId, 60));
+      if (!action || seen.has(action.id)) return null;
+
+      const level = SUPPORT_BY_VALUE.get(str(r.support, 40));
+      const comment = str(r.comment, LIMITS.comment);
+      const skipped = !level;
+      // A skip with nothing attached still counts — it records that the
+      // respondent saw the recommendation and chose not to answer.
+      if (!level && !comment && r.skipped !== true) return null;
+
+      seen.add(action.id);
+      return { action, level, comment, skipped };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+
+  const hasSubstance =
+    parsed.length > 0 || ratings.some((r) => r.level || r.comment);
+  if (!hasSubstance) {
+    return Response.json(
+      { error: "Please rate a recommendation or leave a comment before submitting." },
       { status: 400 },
     );
   }
@@ -147,45 +165,79 @@ export async function POST(req: Request) {
   // it was given at.
   const submissionId = randomUUID();
   const createdAt = new Date().toISOString();
-  const entries = parsed.map((e, i) => ({
-    id: randomUUID(),
+  const stamp = {
     submissionId,
-    entryIndex: i + 1,
-    entryCount: parsed.length,
     createdAt,
     respondentType,
-    // `topic` stays a single string so existing spreadsheet columns keep working.
+    policyStep: CURRENT_POLICY_STEP,
+    policyStage: currentPolicyStep.title,
+  };
+
+  const entries = parsed.map((e, i) => ({
+    id: randomUUID(),
+    ...stamp,
+    entryIndex: i + 1,
+    entryCount: parsed.length,
+    // `topic` stays a single string for a simple flat column alongside `topics`.
     topic: e.topics.join(", "),
     topics: e.topics,
     message: e.message,
-    policyStep: CURRENT_POLICY_STEP,
-    policyStage: currentPolicyStep.title,
+  }));
+
+  const ratingRecords: FeedbackRatingRecord[] = ratings.map((r) => ({
+    id: randomUUID(),
+    ...stamp,
+    pillarId: r.action.pillarId,
+    pillarTitle: getPillar(r.action.pillarId).title,
+    actionId: r.action.id,
+    actionHorizon: r.action.horizon,
+    actionText: r.action.text,
+    support: r.level?.value ?? null,
+    supportScore: r.level?.score ?? null,
+    skipped: r.skipped,
+    comment: r.comment,
   }));
 
   // Local backup log (best-effort — never blocks the submission).
   try {
     const dir = path.join(process.cwd(), ".data");
     await fs.mkdir(dir, { recursive: true });
+    const lines = [
+      ...entries.map((e) => JSON.stringify({ kind: "entry", ...e })),
+      ...ratingRecords.map((r) => JSON.stringify({ kind: "rating", ...r })),
+    ];
     await fs.appendFile(
       path.join(dir, "feedback.jsonl"),
-      entries.map((e) => JSON.stringify(e)).join("\n") + "\n",
+      lines.join("\n") + "\n",
       "utf8",
     );
   } catch (err) {
     console.error("Failed to write local feedback backup:", err);
   }
 
-  // Deliver to Google Sheets, one row per entry. If configured but it fails,
-  // tell the user to retry (the local backup above still captured everything).
-  for (const entry of entries) {
-    const sheet = await sendToGoogleSheets(entry);
-    if (!sheet.ok) {
-      return Response.json(
-        { error: "We couldn't save your feedback right now. Please try again." },
-        { status: 502 },
-      );
-    }
+  // Postgres is the system of record. The whole submission goes in one
+  // transaction; if that fails, nothing was stored, so ask the user to retry.
+  if (!isDatabaseConfigured()) {
+    return Response.json(
+      { error: "Feedback storage isn't configured. Please try again later." },
+      { status: 503 },
+    );
+  }
+  try {
+    await saveFeedback({ entries, ratings: ratingRecords });
+  } catch (err) {
+    console.error("Failed to save feedback to Postgres:", err);
+    return Response.json(
+      { error: "We couldn't save your feedback right now. Please try again." },
+      { status: 502 },
+    );
   }
 
-  return Response.json({ ok: true, count: entries.length });
+  return Response.json({
+    ok: true,
+    entries: entries.length,
+    ratings: ratingRecords.length,
+    // Kept for older clients that read `count`.
+    count: entries.length + ratingRecords.length,
+  });
 }

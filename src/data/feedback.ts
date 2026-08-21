@@ -1,3 +1,5 @@
+import { ALL_ACTIONS } from "@/data/recommendations";
+
 /** Topic areas a piece of feedback can be filed under. Shared by the form
  *  and the API route so the two can never drift apart. */
 export const FEEDBACK_TOPICS = [
@@ -33,4 +35,35 @@ export const MAX_FEEDBACK_ENTRIES = 10;
 
 export const FEEDBACK_LIMITS = {
   message: 5000,
+  /** Per-recommendation comment in the guided review. */
+  comment: 1500,
 };
+
+/**
+ * The five-point scale each recommendation is rated on. `score` is what gets
+ * averaged; `value` is the stable key stored in the database, so the labels
+ * can be reworded later without invalidating the responses already collected.
+ */
+export const SUPPORT_LEVELS = [
+  { value: "strongly_disagree", score: 1, label: "Strongly disagree", short: "Strongly disagree" },
+  { value: "disagree", score: 2, label: "Disagree", short: "Disagree" },
+  { value: "neutral", score: 3, label: "Neutral / not sure", short: "Neutral" },
+  { value: "agree", score: 4, label: "Agree", short: "Agree" },
+  { value: "strongly_agree", score: 5, label: "Strongly agree", short: "Strongly agree" },
+] as const;
+
+export type SupportValue = (typeof SUPPORT_LEVELS)[number]["value"];
+
+export const SUPPORT_BY_VALUE = new Map<string, (typeof SUPPORT_LEVELS)[number]>(
+  SUPPORT_LEVELS.map((l) => [l.value, l]),
+);
+
+/** The question asked above the scale on every recommendation card. */
+export const SUPPORT_QUESTION =
+  "Should this be part of Jamaica's national A.I. policy?";
+
+/**
+ * A submission can carry at most one rating per recommendation, so the cap is
+ * simply the number of recommendations in the policy.
+ */
+export const MAX_FEEDBACK_RATINGS = ALL_ACTIONS.length;
