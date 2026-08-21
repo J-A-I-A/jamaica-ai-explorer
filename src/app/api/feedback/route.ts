@@ -7,6 +7,7 @@ import {
   FEEDBACK_SUBMISSIONS_OPEN,
   MAX_FEEDBACK_ENTRIES,
   MAX_FEEDBACK_RATINGS,
+  ORGANISATION_TYPE,
   RESPONDENT_TYPES,
   SUPPORT_BY_VALUE,
 } from "@/data/feedback";
@@ -152,6 +153,12 @@ export async function POST(req: Request) {
     ? rawType
     : RESPONDENT_TYPES[0];
 
+  // Attribution is optional and only meaningful for an organisation, so an
+  // individual's submission can never carry a name even if one is posted.
+  const isOrg = respondentType === ORGANISATION_TYPE;
+  const orgName = isOrg ? str(b.orgName, LIMITS.name) || null : null;
+  const personName = isOrg ? str(b.personName, LIMITS.name) || null : null;
+
   // Verify reCAPTCHA before doing anything else.
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined;
@@ -169,6 +176,8 @@ export async function POST(req: Request) {
     submissionId,
     createdAt,
     respondentType,
+    orgName,
+    personName,
     policyStep: CURRENT_POLICY_STEP,
     policyStage: currentPolicyStep.title,
   };

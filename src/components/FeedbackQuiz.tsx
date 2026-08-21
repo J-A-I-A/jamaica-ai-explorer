@@ -9,7 +9,9 @@ import {
   type Action,
 } from "@/data/recommendations";
 import {
+  FEEDBACK_LIMITS,
   FEEDBACK_SUBMISSIONS_OPEN,
+  ORGANISATION_TYPE,
   RESPONDENT_TYPES,
   SUPPORT_LEVELS,
 } from "@/data/feedback";
@@ -53,6 +55,8 @@ type Draft = {
   answers: Answers;
   entries: { topics: string[]; message: string }[];
   respondentType: string;
+  orgName: string;
+  personName: string;
 };
 
 export default function FeedbackQuiz() {
@@ -64,6 +68,8 @@ export default function FeedbackQuiz() {
   const [respondentType, setRespondentType] = useState<string>(
     RESPONDENT_TYPES[0],
   );
+  const [orgName, setOrgName] = useState("");
+  const [personName, setPersonName] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [restored, setRestored] = useState(false);
@@ -121,6 +127,8 @@ export default function FeedbackQuiz() {
           setStepIndex(Math.min(Math.max(at, 0), Math.max(stepCount - 1, 0)));
           setAnswers(d.answers ?? {});
           setRespondentType(d.respondentType ?? RESPONDENT_TYPES[0]);
+          setOrgName(d.orgName ?? "");
+          setPersonName(d.personName ?? "");
           // Re-key the entries so ids stay unique against this session's counter.
           const list = (d.entries ?? []).map((e) => ({
             ...newEntry(),
@@ -154,11 +162,13 @@ export default function FeedbackQuiz() {
       answers,
       entries: entries.map((e) => ({ topics: e.topics, message: e.message })),
       respondentType,
+      orgName,
+      personName,
     };
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch {}
-  }, [stage, selected, stepIndex, answers, entries, respondentType]);
+  }, [stage, selected, stepIndex, answers, entries, respondentType, orgName, personName]);
 
   function startOver() {
     try {
@@ -170,6 +180,8 @@ export default function FeedbackQuiz() {
     setAnswers({});
     setEntries([newEntry()]);
     setRespondentType(RESPONDENT_TYPES[0]);
+    setOrgName("");
+    setPersonName("");
     setRestored(false);
     setStatus("idle");
     setError(null);
@@ -272,6 +284,8 @@ export default function FeedbackQuiz() {
     (s) => answerHasContent(answers[s.action.id]) || answers[s.action.id]?.skipped,
   ).length;
 
+  const isOrganisation = respondentType === ORGANISATION_TYPE;
+
   const contentEntries = entries.filter(entryHasContent);
   const entriesValid = contentEntries.every((e) => e.topics.length > 0);
   const hasSubstance =
@@ -298,6 +312,8 @@ export default function FeedbackQuiz() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           respondentType,
+          orgName: isOrganisation ? orgName : "",
+          personName: isOrganisation ? personName : "",
           ratings: ratingsPayload,
           entries: contentEntries.map((en) => ({
             topics: en.topics,
@@ -531,26 +547,69 @@ export default function FeedbackQuiz() {
             </div>
           )}
 
-          <label className="mt-6 block sm:max-w-sm">
-            <span className="text-sm text-jm-text">
-              I&apos;m sharing this feedback as
-            </span>
-            <select
-              value={respondentType}
-              onChange={(e) => setRespondentType(e.target.value)}
-              className={`mt-2 ${fieldClass}`}
-            >
-              {RESPONDENT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-            <span className="mt-2 block text-xs text-jm-muted">
-              No personal details are collected — your feedback is submitted
-              anonymously.
-            </span>
-          </label>
+          <div className="mt-6">
+            <label className="block sm:max-w-sm">
+              <span className="text-sm text-jm-text">
+                I&apos;m sharing this feedback as
+              </span>
+              <select
+                value={respondentType}
+                onChange={(e) => setRespondentType(e.target.value)}
+                className={`mt-2 ${fieldClass}`}
+              >
+                {RESPONDENT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {isOrganisation ? (
+              <div className="fade-up mt-4 rounded-xl border border-jm-line bg-jm-black/40 p-5">
+                <p className="text-sm text-jm-text">
+                  Who should this be attributed to?
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-jm-muted">
+                  Both fields are optional — leave them blank and your
+                  submission stays anonymous.
+                </p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-sm text-jm-text">
+                      Organisation name
+                    </span>
+                    <input
+                      type="text"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      maxLength={FEEDBACK_LIMITS.name}
+                      autoComplete="organization"
+                      placeholder="e.g. Jamaica Chamber of Commerce"
+                      className={`mt-2 ${fieldClass}`}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-sm text-jm-text">Your name</span>
+                    <input
+                      type="text"
+                      value={personName}
+                      onChange={(e) => setPersonName(e.target.value)}
+                      maxLength={FEEDBACK_LIMITS.name}
+                      autoComplete="name"
+                      placeholder="Who is filling this in"
+                      className={`mt-2 ${fieldClass}`}
+                    />
+                  </label>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-jm-muted sm:max-w-sm">
+                No personal details are collected — your feedback is submitted
+                anonymously.
+              </p>
+            )}
+          </div>
 
           <div className="mt-8 border-t border-jm-line pt-6">
             <p className="text-sm text-jm-text">General comments</p>

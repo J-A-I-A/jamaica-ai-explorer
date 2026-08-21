@@ -25,10 +25,15 @@ export type FeedbackTopic = (typeof FEEDBACK_TOPICS)[number];
  */
 export const FEEDBACK_SUBMISSIONS_OPEN: boolean = false;
 
-/** Who is speaking. The form collects nothing else about the respondent. */
+/** Who is speaking. An individual is asked for nothing else; an organisation
+ *  may optionally name itself and the person filling the form in. */
 export const RESPONDENT_TYPES = ["Individual", "Organisation / Company"] as const;
 
 export type RespondentType = (typeof RESPONDENT_TYPES)[number];
+
+/** The respondent type that unlocks the optional attribution fields. Shared so
+ *  the form and the API agree on which answer counts as an organisation. */
+export const ORGANISATION_TYPE = RESPONDENT_TYPES[1];
 
 /** How many separate pieces of feedback one submission may carry. */
 export const MAX_FEEDBACK_ENTRIES = 10;
@@ -37,6 +42,8 @@ export const FEEDBACK_LIMITS = {
   message: 5000,
   /** Per-recommendation comment in the guided review. */
   comment: 1500,
+  /** Optional organisation and contact names. */
+  name: 160,
 };
 
 /**

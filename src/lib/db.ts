@@ -23,6 +23,9 @@ export type FeedbackRecord = {
   entryCount: number;
   createdAt: string;
   respondentType: string;
+  /** Optional attribution, only ever set for an organisation respondent. */
+  orgName: string | null;
+  personName: string | null;
   topic: string;
   topics: string[];
   message: string;
@@ -38,6 +41,9 @@ export type FeedbackRatingRecord = {
   submissionId: string;
   createdAt: string;
   respondentType: string;
+  /** Optional attribution, only ever set for an organisation respondent. */
+  orgName: string | null;
+  personName: string | null;
   pillarId: number;
   pillarTitle: string;
   actionId: string;
@@ -119,6 +125,8 @@ const CREATE_TABLE_SQL = `
     entry_count     integer     NOT NULL,
     created_at      timestamptz NOT NULL,
     respondent_type text        NOT NULL,
+    org_name        text,
+    person_name     text,
     topic           text        NOT NULL,
     topics          text[]      NOT NULL,
     message         text        NOT NULL,
@@ -136,6 +144,8 @@ const CREATE_TABLE_SQL = `
     submission_id   uuid        NOT NULL,
     created_at      timestamptz NOT NULL,
     respondent_type text        NOT NULL,
+    org_name        text,
+    person_name     text,
     pillar_id       integer     NOT NULL,
     pillar_title    text        NOT NULL,
     action_id       text        NOT NULL,
@@ -156,6 +166,13 @@ const CREATE_TABLE_SQL = `
     ON feedback_ratings (action_id);
   CREATE INDEX IF NOT EXISTS feedback_ratings_created_at_idx
     ON feedback_ratings (created_at DESC);
+
+  -- Optional attribution, added after the first release: bring tables created
+  -- by an earlier deploy up to the current shape.
+  ALTER TABLE feedback_entries ADD COLUMN IF NOT EXISTS org_name    text;
+  ALTER TABLE feedback_entries ADD COLUMN IF NOT EXISTS person_name text;
+  ALTER TABLE feedback_ratings ADD COLUMN IF NOT EXISTS org_name    text;
+  ALTER TABLE feedback_ratings ADD COLUMN IF NOT EXISTS person_name text;
 `;
 
 let schemaReady: Promise<void> | null = null;
@@ -198,8 +215,9 @@ export async function saveFeedback({
       await client.query(
         `INSERT INTO feedback_entries (
            id, submission_id, entry_index, entry_count, created_at,
-           respondent_type, topic, topics, message, policy_step, policy_stage
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           respondent_type, org_name, person_name,
+           topic, topics, message, policy_step, policy_stage
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          ON CONFLICT (id) DO NOTHING`,
         [
           e.id,
@@ -208,6 +226,8 @@ export async function saveFeedback({
           e.entryCount,
           e.createdAt,
           e.respondentType,
+          e.orgName,
+          e.personName,
           e.topic,
           e.topics,
           e.message,
@@ -219,16 +239,18 @@ export async function saveFeedback({
     for (const r of ratings) {
       await client.query(
         `INSERT INTO feedback_ratings (
-           id, submission_id, created_at, respondent_type,
+           id, submission_id, created_at, respondent_type, org_name, person_name,
            pillar_id, pillar_title, action_id, action_horizon, action_text,
            support, support_score, skipped, comment, policy_step, policy_stage
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
          ON CONFLICT (submission_id, action_id) DO NOTHING`,
         [
           r.id,
           r.submissionId,
           r.createdAt,
           r.respondentType,
+          r.orgName,
+          r.personName,
           r.pillarId,
           r.pillarTitle,
           r.actionId,
