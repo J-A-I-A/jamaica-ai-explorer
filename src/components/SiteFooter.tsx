@@ -53,7 +53,7 @@ export default function SiteFooter() {
       <div className="border-t border-jm-line/70">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-5 text-xs text-jm-muted sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <span>
-            Donated by the{" "}
+            Made and donated to the GOJ by the{" "}
             <a
               className="hover:text-jm-text"
               href="https://jaia.org.jm/"
