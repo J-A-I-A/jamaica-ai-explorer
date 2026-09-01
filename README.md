@@ -7,14 +7,14 @@ Prime Minister.
 ## Run it
 
 ```bash
-npm install
-npm run dev      # http://localhost:3000
+yarn install
+yarn run dev      # http://localhost:3000
 ```
 
 Production build:
 
 ```bash
-npm run build && npm start
+yarn run build && yarn start
 ```
 
 ## Routes
