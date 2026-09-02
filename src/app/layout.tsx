@@ -23,6 +23,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
+/** Applies the theme before first paint, so the page never flashes the wrong
+ *  one: an explicit choice wins, otherwise light unless the system asks for
+ *  dark. Passed as script *children*, which React renders as text content — no
+ *  `innerHTML`-style injection, and unlike `next/script` it stays
+ *  render-blocking in the head, which is the entire point. */
+const THEME_INIT = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -33,12 +40,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Set the theme before first paint to avoid a flash of the wrong theme. */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark'){t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
-          }}
-        />
+        <script>{THEME_INIT}</script>
       </head>
       <body
         className="min-h-full flex flex-col font-sans antialiased"

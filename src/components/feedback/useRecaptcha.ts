@@ -34,9 +34,9 @@ export function useRecaptcha(enabled = true) {
     let poll: ReturnType<typeof setInterval> | undefined;
 
     const themeNow = () =>
-      document.documentElement.getAttribute("data-theme") === "light"
-        ? "light"
-        : "dark";
+      document.documentElement.getAttribute("data-theme") === "dark"
+        ? "dark"
+        : "light";
 
     // Render into a freshly created child so re-rendering (on theme change)
     // never hits "reCAPTCHA has already been rendered in this element".

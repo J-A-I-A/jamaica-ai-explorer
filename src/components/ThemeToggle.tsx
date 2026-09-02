@@ -1,22 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 type Theme = "light" | "dark";
 
-export default function ThemeToggle() {
-  // Starts null so server and first client render match; the real theme
-  // (already applied to <html> by the inline no-flash script) is read after mount.
-  const [theme, setTheme] = useState<Theme | null>(null);
+// The theme isn't React state — it lives on <html data-theme>, put there before
+// first paint by the bootstrap script in the root layout. Subscribing to that
+// attribute keeps the button in step with anything else that changes the theme,
+// and avoids mirroring the same value into a second source of truth.
+function subscribe(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+  return () => observer.disconnect();
+}
 
-  useEffect(() => {
-    const current = document.documentElement.getAttribute("data-theme");
-    setTheme(current === "light" ? "light" : "dark");
-  }, []);
+const readTheme = (): Theme =>
+  document.documentElement.getAttribute("data-theme") === "dark"
+    ? "dark"
+    : "light";
+
+// The server can't know the theme, so it assumes the default — which is also
+// what the client renders on its first, pre-hydration pass, so the two agree.
+const readServerTheme = (): Theme => "light";
+
+export default function ThemeToggle() {
+  const theme = useSyncExternalStore<Theme>(
+    subscribe,
+    readTheme,
+    readServerTheme,
+  );
 
   function toggle() {
     const next: Theme = theme === "light" ? "dark" : "light";
-    setTheme(next);
+    // No setState: the observer above turns this into a re-render.
     document.documentElement.setAttribute("data-theme", next);
     try {
       localStorage.setItem("theme", next);

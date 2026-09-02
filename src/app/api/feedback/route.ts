@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import { isIP } from "net";
 import {
   FEEDBACK_TOPICS,
   FEEDBACK_LIMITS as LIMITS,
@@ -40,17 +41,30 @@ function normaliseTopics(raw: unknown): string[] {
 }
 
 // --- reCAPTCHA v2 verification (enforced only when a secret is configured) ---
+
+/** The one endpoint this route ever talks to. A fixed constant: no part of a
+ *  request contributes to the URL, so a posted value can't redirect the call at
+ *  an internal host. */
+const RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
+
+/** Google's tokens are URL-safe base64. Kept deliberately wide — the token only
+ *  ever goes into a form-encoded body, so this is a sanity check, and anything
+ *  narrower risks turning a real token into a submission the user can't send. */
+const RECAPTCHA_TOKEN = /^[A-Za-z0-9._~=-]{20,4000}$/;
+
 async function verifyRecaptcha(token: string, remoteIp?: string) {
   const secret = process.env.RECAPTCHA_SECRET_KEY;
   if (!secret) return { ok: true as const }; // not configured — skip
 
-  if (!token) {
+  if (!RECAPTCHA_TOKEN.test(token)) {
     return { ok: false as const, error: "Please complete the reCAPTCHA challenge." };
   }
   try {
     const params = new URLSearchParams({ secret, response: token });
-    if (remoteIp) params.set("remoteip", remoteIp);
-    const res = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+    // `remoteip` is an optional hint to Google; a proxy header we don't control
+    // only goes along when it is genuinely an IP.
+    if (remoteIp && isIP(remoteIp)) params.set("remoteip", remoteIp);
+    const res = await fetch(RECAPTCHA_VERIFY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params,

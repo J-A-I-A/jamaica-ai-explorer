@@ -1,23 +1,10 @@
 @import "tailwindcss";
 
+/* Light theme — the default, and what renders if the no-flash script in the
+   root layout never runs. Gold becomes a deep amber so it stays readable as
+   text on light surfaces, while cream "ink" text keeps contrast on amber
+   buttons. */
 :root {
-  color-scheme: dark;
-  --jm-black: #0b0b0c;
-  --jm-ink: #131417;
-  --jm-panel: #1a1c20;
-  --jm-line: #2b2e34;
-  --jm-gold: #ffb400;
-  --jm-gold-soft: #ffd166;
-  --jm-green: #009b3a;
-  --jm-green-soft: #38d17a;
-  --jm-text: #f2f1ee;
-  --jm-muted: #a3a6ad;
-}
-
-/* Light theme — opt-in via data-theme on <html>.
-   Gold becomes a deep amber so it stays readable as text on light
-   surfaces, while cream "ink" text keeps contrast on amber buttons. */
-:root[data-theme="light"] {
   color-scheme: light;
   --jm-black: #f4f2ec;
   --jm-ink: #ffffff;
@@ -29,6 +16,22 @@
   --jm-green-soft: #0a8a3f;
   --jm-text: #16181c;
   --jm-muted: #5c6068;
+}
+
+/* Dark theme — opt-in via data-theme on <html>, set before first paint either
+   because the visitor chose it or because their system asks for it. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --jm-black: #0b0b0c;
+  --jm-ink: #131417;
+  --jm-panel: #1a1c20;
+  --jm-line: #2b2e34;
+  --jm-gold: #ffb400;
+  --jm-gold-soft: #ffd166;
+  --jm-green: #009b3a;
+  --jm-green-soft: #38d17a;
+  --jm-text: #f2f1ee;
+  --jm-muted: #a3a6ad;
 }
 
 @theme inline {

@@ -15,17 +15,39 @@ type View = "byPillar" | "list";
 
 const HORIZON_KEYS: Horizon[] = ["short", "medium", "long"];
 
+/** Split `text` into alternating plain and matching runs with a case-insensitive
+ *  substring scan. Deliberately not a `RegExp`: building one from the search box
+ *  would let a crafted query cost far more to run than it does to type. */
+function splitOnQuery(text: string, query: string) {
+  const haystack = text.toLowerCase();
+  const needle = query.toLowerCase();
+  // Lower-casing a few characters changes their length, which would throw the
+  // offsets below out of step with `text`. Rare enough to just not highlight.
+  if (haystack.length !== text.length || needle.length !== query.length) {
+    return [{ text, match: false }];
+  }
+
+  const parts: { text: string; match: boolean }[] = [];
+  let from = 0;
+  for (let at = haystack.indexOf(needle); at !== -1; at = haystack.indexOf(needle, from)) {
+    if (at > from) parts.push({ text: text.slice(from, at), match: false });
+    from = at + needle.length;
+    parts.push({ text: text.slice(at, from), match: true });
+  }
+  if (from < text.length) parts.push({ text: text.slice(from), match: false });
+  return parts;
+}
+
 function highlight(text: string, query: string) {
-  if (!query.trim()) return text;
-  const safe = query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const parts = text.split(new RegExp(`(${safe})`, "ig"));
-  return parts.map((part, i) =>
-    part.toLowerCase() === query.trim().toLowerCase() ? (
+  const q = query.trim();
+  if (!q) return text;
+  return splitOnQuery(text, q).map((part, i) =>
+    part.match ? (
       <mark key={i} className="rounded bg-jm-gold/30 text-jm-gold-soft">
-        {part}
+        {part.text}
       </mark>
     ) : (
-      <span key={i}>{part}</span>
+      <span key={i}>{part.text}</span>
     )
   );
 }
