@@ -13,12 +13,13 @@ export default function Roadmap() {
   return (
     <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8">
       {/* Horizon controls */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div role="group" aria-label="Filter by implementation horizon" className="grid gap-4 sm:grid-cols-3">
         {ORDER.map((h) => {
           const on = focus === h;
           return (
             <button
               key={h}
+              type="button"
               onClick={() => setFocus(on ? null : h)}
               aria-pressed={on}
               className={`rounded-xl border p-5 text-left transition-colors ${
@@ -28,21 +29,26 @@ export default function Roadmap() {
               <p className="font-display text-sm font-semibold uppercase tracking-wider">
                 {HORIZONS[h].label}
               </p>
-              <p className="mt-1 text-xs opacity-70">{HORIZONS[h].range}</p>
+              <p className="mt-1 text-xs">{HORIZONS[h].range}</p>
               <p className="mt-3 font-display text-3xl font-semibold">{COUNTS[h]}</p>
-              <p className="mt-1 text-xs opacity-80">recommendations</p>
+              <p className="mt-1 text-xs">recommendations</p>
             </button>
           );
         })}
       </div>
-      <p className="mt-3 text-xs text-jm-muted">
+      <p className="mt-3 text-xs text-jm-muted" aria-live="polite">
         {focus
-          ? `Showing ${HORIZONS[focus].label.toLowerCase()} items only — click again to show all.`
-          : "Click a horizon to isolate it."}
+          ? `Showing ${HORIZONS[focus].label.toLowerCase()} items only — select it again to show all.`
+          : "Select a horizon to isolate it."}
       </p>
 
       {/* Matrix */}
-      <div className="mt-8 overflow-x-auto">
+      <div
+        className="mt-8 overflow-x-auto"
+        role="region"
+        aria-label="Recommendations by pillar and horizon"
+        tabIndex={0}
+      >
         <div className="min-w-[860px]">
           <div
             className="grid gap-px overflow-hidden rounded-t-xl border border-jm-line bg-jm-line"
@@ -80,12 +86,16 @@ export default function Roadmap() {
                   return (
                     <div key={h} className="bg-jm-ink px-5 py-5">
                       {items.length === 0 ? (
-                        <span className="text-xs text-jm-muted/50">—</span>
+                        <span className="text-xs text-jm-muted">
+                          <span aria-hidden>—</span>
+                          <span className="sr-only">No recommendations</span>
+                        </span>
                       ) : (
                         <ul className="space-y-3">
                           {items.map((a) => (
                             <li key={a.text} className="flex gap-2.5 text-[13px] leading-relaxed">
                               <span
+                                aria-hidden
                                 className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
                                   h === "short"
                                     ? "bg-jm-gold"

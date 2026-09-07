@@ -17,18 +17,18 @@ export default function FeedbackCta() {
   if (pathname === "/feedback") return null;
 
   return (
-    <section className="border-t border-jm-line/70 bg-jm-ink">
+    <section aria-labelledby="feedback-cta-heading" className="border-t border-jm-line/70 bg-jm-ink">
       <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8">
         <div className="flex flex-col gap-7 rounded-2xl border border-jm-gold/30 bg-jm-gold/5 p-8 sm:p-10 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
             <span className="inline-flex items-center gap-2 rounded-full border border-jm-gold/40 bg-jm-black/40 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-jm-gold">
-              <span className="relative flex h-1.5 w-1.5">
+              <span className="relative flex h-1.5 w-1.5" aria-hidden>
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-jm-gold opacity-75" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-jm-gold" />
               </span>
               Open for feedback
             </span>
-            <h2 className="mt-4 font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+            <h2 id="feedback-cta-heading" className="mt-4 font-display text-2xl font-semibold tracking-tight sm:text-3xl">
               This policy isn&apos;t finished — tell the Task Force what you
               think
             </h2>

@@ -71,7 +71,8 @@ export default function EthicsPage() {
                   className="text-sm text-jm-text hover:text-jm-gold"
                 >
                   {r.text}
-                  <span className="ml-2 text-jm-muted">↗</span>
+                  <span className="ml-2 text-jm-muted" aria-hidden>↗</span>
+                  <span className="sr-only"> (opens in a new tab)</span>
                 </a>
               </li>
             ))}

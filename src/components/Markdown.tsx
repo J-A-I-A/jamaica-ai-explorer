@@ -14,8 +14,13 @@ export default function Markdown({ children }: { children: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          a: ({ ...props }) => (
-            <a {...props} target="_blank" rel="noreferrer noopener" />
+          // Assistant answers cite external sources; every one of them opens a
+          // new tab, so say so rather than springing the context change.
+          a: ({ children, ...props }) => (
+            <a {...props} target="_blank" rel="noreferrer noopener">
+              {children}
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
           ),
           table: ({ ...props }) => (
             <div className="md-table-wrap">

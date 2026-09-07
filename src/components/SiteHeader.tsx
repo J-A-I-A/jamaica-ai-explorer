@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const NAV = [
@@ -21,6 +21,21 @@ const FEEDBACK_HREF = "/feedback";
 export default function SiteHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+
+  // Escape closes the mobile menu and hands focus back to the button that
+  // opened it, so keyboard users are never stranded (WCAG 2.1.2).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        toggleRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-jm-line/70 bg-jm-black/85 backdrop-blur">
@@ -46,13 +61,14 @@ export default function SiteHeader() {
         </Link>
 
         <div className="flex items-center gap-2">
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav aria-label="Main" className="hidden items-center gap-1 md:flex">
             {NAV.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={active ? "page" : undefined}
                   className={`rounded-md px-3 py-2 text-sm transition-colors ${
                     active
                       ? "bg-jm-panel text-jm-gold"
@@ -70,7 +86,7 @@ export default function SiteHeader() {
             aria-current={pathname === FEEDBACK_HREF ? "page" : undefined}
             className="inline-flex items-center gap-1.5 rounded-md bg-jm-gold px-3 py-2 text-xs font-semibold text-jm-black transition-colors hover:bg-jm-gold-soft sm:text-sm md:ml-2 md:px-4"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.9 8.9 0 01-3.9-.9L3 20.5l1.5-4.4A8.4 8.4 0 013.6 11.5a8.4 8.4 0 018.4-8.4h.5a8.4 8.4 0 018.5 8.4z" />
             </svg>
             <span className="hidden sm:inline">Share your feedback</span>
@@ -80,33 +96,44 @@ export default function SiteHeader() {
           <ThemeToggle />
 
           <button
+            ref={toggleRef}
             type="button"
-            aria-label="Toggle navigation"
+            aria-label={open ? "Close navigation menu" : "Open navigation menu"}
             aria-expanded={open}
+            aria-controls="mobile-nav"
             onClick={() => setOpen((v) => !v)}
-            className="rounded-md border border-jm-line p-2 text-jm-muted md:hidden"
+            className="rounded-md border border-jm-field p-2 text-jm-muted md:hidden"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
               {open ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
             </svg>
           </button>
         </div>
       </div>
 
-      {open && (
-        <nav className="border-t border-jm-line/70 px-5 pb-4 md:hidden">
-          {NAV.map((item) => (
+      <nav
+        id="mobile-nav"
+        aria-label="Main"
+        hidden={!open}
+        className="border-t border-jm-line/70 px-5 pb-4 md:hidden"
+      >
+        {NAV.map((item) => {
+          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               onClick={() => setOpen(false)}
-              className="block rounded-md px-3 py-2 text-sm text-jm-muted hover:bg-jm-panel hover:text-jm-text"
+              className={`block rounded-md px-3 py-2 text-sm hover:bg-jm-panel hover:text-jm-text ${
+                active ? "text-jm-gold" : "text-jm-muted"
+              }`}
             >
               {item.label}
             </Link>
-          ))}
-        </nav>
-      )}
+          );
+        })}
+      </nav>
     </header>
   );
 }

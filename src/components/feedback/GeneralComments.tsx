@@ -73,11 +73,22 @@ export default function GeneralComments({
             </div>
 
             <div className="mt-4">
-              <span className="text-sm text-jm-text">Topic areas</span>
+              <span id={`topics-label-${entry.id}`} className="text-sm text-jm-text">
+                Topic areas
+              </span>
               <span className="ml-1 text-xs text-jm-muted">
                 (select one or more)
               </span>
-              <div className="mt-2.5 flex flex-wrap gap-2">
+              <div
+                role="group"
+                aria-labelledby={`topics-label-${entry.id}`}
+                aria-describedby={
+                  entryHasContent(entry) && entry.topics.length === 0
+                    ? `topics-error-${entry.id}`
+                    : undefined
+                }
+                className="mt-2.5 flex flex-wrap gap-2"
+              >
                 {FEEDBACK_TOPICS.map((t) => {
                   const on = entry.topics.includes(t);
                   return (
@@ -113,14 +124,17 @@ export default function GeneralComments({
               />
               <span className="mt-1 block text-right text-xs text-jm-muted">
                 {entry.message.length}/{FEEDBACK_LIMITS.message}
+                <span className="sr-only"> characters used</span>
               </span>
             </label>
 
-            {entryHasContent(entry) && entry.topics.length === 0 && (
-              <p className="mt-1 text-xs text-jm-gold-soft">
-                Pick at least one topic area for this comment.
-              </p>
-            )}
+            <div role="alert">
+              {entryHasContent(entry) && entry.topics.length === 0 && (
+                <p id={`topics-error-${entry.id}`} className="mt-1 text-xs text-jm-gold-soft">
+                  Pick at least one topic area for this comment.
+                </p>
+              )}
+            </div>
           </fieldset>
         ))}
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import type { Pillar } from "@/data/recommendations";
 import type { SupportValue } from "@/data/feedback";
 import {
@@ -49,6 +49,30 @@ export default function RecommendationCard({
   // comment here on an earlier pass through the flow.
   const [showComment, setShowComment] = useState(answer.comment.length > 0);
   const commentRef = useRef<HTMLTextAreaElement>(null);
+  const radioRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // Generated rather than hardcoded so two cards on one screen can never
+  // collide on the same id and break the aria-labelledby wiring.
+  const questionId = useId();
+
+  // A radiogroup is a single stop in the tab order, and arrow keys move between
+  // the options — without this the group is announced as radios but behaves
+  // like five unrelated buttons (WCAG 4.1.2 / ARIA authoring practices).
+  const selectedIndex = SUPPORT_LEVELS.findIndex((l) => l.value === answer.support);
+
+  function onRadioKeyDown(e: React.KeyboardEvent, i: number) {
+    const last = SUPPORT_LEVELS.length - 1;
+    let next: number | null = null;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = i === last ? 0 : i + 1;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = i === 0 ? last : i - 1;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = last;
+    if (next === null) return;
+    // Stop the page-level Left/Right shortcuts from also changing question.
+    e.preventDefault();
+    e.stopPropagation();
+    onChange({ support: SUPPORT_LEVELS[next].value, skipped: false });
+    radioRefs.current[next]?.focus();
+  }
 
   return (
     <div className="fade-up rounded-xl border border-jm-line bg-jm-ink p-6 sm:p-8">
@@ -65,20 +89,30 @@ export default function RecommendationCard({
       </p>
 
       <div className="mt-7">
-        <p className="text-sm text-jm-text">{SUPPORT_QUESTION}</p>
+        <p id={questionId} className="text-sm text-jm-text">
+          {SUPPORT_QUESTION}
+        </p>
         <div
           role="radiogroup"
-          aria-label={SUPPORT_QUESTION}
+          aria-labelledby={questionId}
           className="mt-3 grid gap-2 sm:grid-cols-5"
         >
           {SUPPORT_LEVELS.map((level, i) => {
             const on = answer.support === level.value;
+            // Roving tabindex: the checked option is the group's tab stop, or
+            // the first one while nothing is chosen yet.
+            const isTabStop = selectedIndex === -1 ? i === 0 : on;
             return (
               <button
                 key={level.value}
+                ref={(el) => {
+                  radioRefs.current[i] = el;
+                }}
                 type="button"
                 role="radio"
                 aria-checked={on}
+                tabIndex={isTabStop ? 0 : -1}
+                onKeyDown={(e) => onRadioKeyDown(e, i)}
                 onClick={() =>
                   onChange({
                     support: on ? null : level.value,
@@ -106,7 +140,7 @@ export default function RecommendationCard({
             );
           })}
         </div>
-        <p className="mt-2 hidden text-[11px] text-jm-muted/80 sm:block">
+        <p className="mt-2 hidden text-[11px] text-jm-muted sm:block">
           Tip: press 1–5 to rate, S to skip, and Enter for the next one.
         </p>
       </div>
@@ -129,6 +163,7 @@ export default function RecommendationCard({
             />
             <span className="mt-1 block text-right text-xs text-jm-muted">
               {answer.comment.length}/{FEEDBACK_LIMITS.comment}
+              <span className="sr-only"> characters used</span>
             </span>
           </label>
         ) : (

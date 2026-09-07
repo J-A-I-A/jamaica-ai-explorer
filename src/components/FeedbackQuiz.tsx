@@ -80,6 +80,7 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
 
   const hydrated = useRef(false);
   const topRef = useRef<HTMLDivElement>(null);
+  const reviewRef = useRef<HTMLDivElement>(null);
   const {
     wrapRef: captchaRef,
     active: captchaActive,
@@ -193,7 +194,13 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
 
   // --- navigation ----------------------------------------------------------
   const scrollToTop = useCallback(() => {
-    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    topRef.current?.scrollIntoView({
+      behavior: reduce ? "auto" : "smooth",
+      block: "start",
+    });
   }, []);
 
   const goTo = useCallback(
@@ -226,10 +233,15 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
     goTo(stepIndex + 1);
   }, [step, stepIndex, patchAnswer, goTo]);
 
-  // Keyboard shortcuts make a 43-card review far less of a chore. They stay
-  // out of the way while the respondent is typing a comment.
+  // Keyboard shortcuts make a 43-card review far less of a chore. WCAG 2.1.4
+  // only permits single-character shortcuts that are active while a component
+  // has focus, so these are bound to the review region rather than the window,
+  // and go quiet the moment focus leaves it (e.g. for the site header).
   useEffect(() => {
     if (stage !== "review" || step?.kind !== "action") return;
+    const region = reviewRef.current;
+    if (!region) return;
+
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const el = e.target as HTMLElement | null;
@@ -239,13 +251,19 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
         tag === "INPUT" ||
         tag === "SELECT" ||
         el?.isContentEditable;
+      if (typing) return;
 
-      if (e.key === "Enter" && !typing) {
+      // Enter and Space belong to whatever control has focus — intercepting
+      // them here made "Back" navigate forward instead of activating.
+      const onControl =
+        tag === "BUTTON" || tag === "A" || el?.getAttribute("role") === "radio";
+
+      if (e.key === "Enter") {
+        if (onControl) return;
         e.preventDefault();
         goTo(stepIndex + 1);
         return;
       }
-      if (typing) return;
 
       const numbered = SUPPORT_LEVELS[Number(e.key) - 1];
       if (e.key >= "1" && e.key <= "5" && numbered) {
@@ -254,17 +272,31 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
       } else if (e.key.toLowerCase() === "s") {
         e.preventDefault();
         skipCurrent();
-      } else if (e.key === "ArrowRight") {
+      } else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        // The rating radiogroup owns the arrow keys while it has focus.
+        if (onControl) return;
         e.preventDefault();
-        goTo(stepIndex + 1);
-      } else if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        goTo(stepIndex - 1);
+        goTo(stepIndex + (e.key === "ArrowRight" ? 1 : -1));
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+
+    region.addEventListener("keydown", onKey);
+    return () => region.removeEventListener("keydown", onKey);
   }, [stage, step, stepIndex, goTo, patchAnswer, skipCurrent]);
+
+  // The confirmation screen replaces the form in place; move focus to it so
+  // keyboard users are not left on a button that no longer exists.
+  useEffect(() => {
+    if (stage === "done") topRef.current?.focus({ preventScroll: true });
+  }, [stage]);
+
+  // Each step swaps the card's contents without a navigation, so focus is moved
+  // to the new card: it announces the new question and keeps the shortcuts above
+  // in scope (WCAG 2.4.3).
+  useEffect(() => {
+    if (stage !== "review") return;
+    reviewRef.current?.focus({ preventScroll: true });
+  }, [stage, stepIndex]);
 
   // --- what's actually being submitted -------------------------------------
   const ratingsPayload = useMemo(
@@ -346,7 +378,13 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
   // --- render --------------------------------------------------------------
   if (stage === "done") {
     return (
-      <div ref={topRef} className="scroll-mt-24 rounded-xl border border-jm-green-soft/40 bg-jm-green/10 p-8 text-center">
+      <div
+        ref={topRef}
+        tabIndex={-1}
+        role="status"
+        aria-live="polite"
+        className="focus-target scroll-mt-24 rounded-xl border border-jm-green-soft/40 bg-jm-green/10 p-8 text-center"
+      >
         <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-jm-green text-jm-black">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
             <path d="M20 6L9 17l-5-5" />
@@ -426,7 +464,13 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
       )}
 
       {stage === "review" && step && (
-        <div>
+        <div
+          ref={reviewRef}
+          tabIndex={-1}
+          role="group"
+          aria-labelledby="review-position"
+          className="focus-target"
+        >
           <ReviewProgress
             answered={answeredSoFar}
             total={actionSteps.length}
@@ -629,18 +673,22 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
           </div>
 
           {captchaActive && (
-            <div className="mt-6">
-              <span className="text-sm text-jm-text">Verification</span>
+            <div className="mt-6" role="group" aria-labelledby="captcha-label">
+              <span id="captcha-label" className="text-sm text-jm-text">
+                Verification
+              </span>
               <div ref={captchaRef} className="recaptcha-frame mt-2" />
             </div>
           )}
 
-          {status === "error" && error && (
-            <p className="mt-4 text-sm text-jm-gold-soft">{error}</p>
-          )}
+          <div role="alert" aria-live="assertive">
+            {status === "error" && error && (
+              <p className="mt-4 text-sm text-jm-gold-soft">{error}</p>
+            )}
+          </div>
 
           {!hasSubstance && (
-            <p className="mt-4 text-sm text-jm-muted">
+            <p id="submit-requirement" className="mt-4 text-sm text-jm-muted">
               Rate at least one recommendation or leave a comment before
               submitting.
             </p>
@@ -653,6 +701,10 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
             </p>
           )}
 
+          <p className="sr-only" role="status" aria-live="polite">
+            {status === "sending" ? "Submitting your feedback…" : ""}
+          </p>
+
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
             <p className="max-w-sm text-xs text-jm-muted">
               Your feedback is stored privately and used to improve the policy
@@ -661,6 +713,7 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
             <button
               type="submit"
               disabled={!canSubmit}
+              aria-describedby={!hasSubstance ? "submit-requirement" : undefined}
               className="shrink-0 rounded-md bg-jm-gold px-5 py-2.5 text-sm font-semibold text-jm-black transition-colors hover:bg-jm-gold-soft disabled:cursor-not-allowed disabled:opacity-40"
             >
               {!FEEDBACK_SUBMISSIONS_OPEN
@@ -694,7 +747,7 @@ function ReviewProgress({
   return (
     <div className="mb-4">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 text-xs text-jm-muted">
-        <span>
+        <span id="review-position">
           {position > 0 ? (
             <>
               <span className="text-jm-text">

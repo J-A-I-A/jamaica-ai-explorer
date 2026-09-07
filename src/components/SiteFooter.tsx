@@ -14,8 +14,10 @@ export default function SiteFooter() {
           </p>
         </div>
 
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-jm-gold">Sections</p>
+        <nav aria-labelledby="footer-sections">
+          <p id="footer-sections" className="text-[11px] uppercase tracking-[0.18em] text-jm-gold">
+            Sections
+          </p>
           <ul className="mt-4 space-y-2 text-sm text-jm-muted">
             <li><Link className="hover:text-jm-text" href="/explore">Explore recommendations</Link></li>
             <li><Link className="hover:text-jm-text" href="/roadmap">Action plan roadmap</Link></li>
@@ -25,14 +27,16 @@ export default function SiteFooter() {
             <li><Link className="hover:text-jm-text" href="/assistant">Smart Search</Link></li>
             <li>
               <Link className="font-medium text-jm-gold hover:text-jm-gold-soft" href="/feedback">
-                Share your feedback →
+                Share your feedback <span aria-hidden>→</span>
               </Link>
             </li>
           </ul>
-        </div>
+        </nav>
 
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.18em] text-jm-gold">References</p>
+        <nav aria-labelledby="footer-references">
+          <p id="footer-references" className="text-[11px] uppercase tracking-[0.18em] text-jm-gold">
+            References
+          </p>
           <ul className="mt-4 space-y-2 text-sm text-jm-muted">
             {REFERENCES.map((r) => (
               <li key={r.href}>
@@ -43,11 +47,13 @@ export default function SiteFooter() {
                   rel="noreferrer noopener"
                 >
                   {r.text}
+                  {/* Warn before the context change (WCAG 3.2.5). */}
+                  <span className="sr-only"> (opens in a new tab)</span>
                 </a>
               </li>
             ))}
           </ul>
-        </div>
+        </nav>
       </div>
 
       <div className="border-t border-jm-line/70">
@@ -61,6 +67,7 @@ export default function SiteFooter() {
               rel="noreferrer noopener"
             >
               Jamaica Artificial Intelligence Association
+              <span className="sr-only"> (opens in a new tab)</span>
             </a>
           </span>
           <span>Aligned with Vision 2030 Jamaica.</span>

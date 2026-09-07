@@ -52,7 +52,7 @@ export default function ThemeToggle() {
       onClick={toggle}
       aria-label={isLight ? "Switch to dark theme" : "Switch to light theme"}
       title={isLight ? "Switch to dark theme" : "Switch to light theme"}
-      className="grid h-9 w-9 place-items-center rounded-md border border-jm-line text-jm-muted transition-colors hover:border-jm-gold/50 hover:text-jm-gold"
+      className="grid h-9 w-9 place-items-center rounded-md border border-jm-field text-jm-muted transition-colors hover:border-jm-gold hover:text-jm-gold"
     >
       <svg
         width="18"

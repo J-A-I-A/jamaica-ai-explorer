@@ -13,7 +13,7 @@ export function HorizonBadge({ horizon }: { horizon: Horizon }) {
       className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${horizonStyles[horizon]}`}
     >
       {HORIZONS[horizon].label}
-      <span className="opacity-60">{HORIZONS[horizon].range}</span>
+      <span>{HORIZONS[horizon].range}</span>
     </span>
   );
 }

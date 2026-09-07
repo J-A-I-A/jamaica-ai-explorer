@@ -24,14 +24,14 @@ export default function Home() {
         <div className="relative mx-auto max-w-7xl px-5 py-20 sm:px-8 sm:py-28">
           <div className="flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-jm-line bg-jm-panel/60 px-3 py-1 text-xs text-jm-muted">
-              <span className="h-1.5 w-1.5 rounded-full bg-jm-green-soft" />
+              <span className="h-1.5 w-1.5 rounded-full bg-jm-green-soft" aria-hidden />
               Presented to the Office of the Prime Minister
             </div>
             <Link
               href="/feedback"
               className="inline-flex items-center gap-2 rounded-full border border-jm-gold/40 bg-jm-gold/10 px-3 py-1 text-xs font-medium text-jm-gold-soft transition-colors hover:bg-jm-gold/20"
             >
-              <span className="h-1.5 w-1.5 rounded-full bg-jm-gold" />
+              <span className="h-1.5 w-1.5 rounded-full bg-jm-gold" aria-hidden />
               Open for public feedback — Step {CURRENT_POLICY_STEP} of{" "}
               {POLICY_TIMELINE.length}
             </Link>
@@ -59,7 +59,7 @@ export default function Home() {
             </Link>
             <Link
               href="/feedback"
-              className="inline-flex items-center gap-2 rounded-md bg-jm-green px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-jm-green-soft hover:text-jm-black"
+              className="inline-flex items-center gap-2 rounded-md bg-jm-green px-5 py-3 text-sm font-semibold text-jm-black transition-colors hover:bg-jm-green-soft"
             >
               Share your feedback
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -81,9 +81,11 @@ export default function Home() {
               { k: "Task force members", v: 17 },
               { k: "Year horizon", v: 10 },
             ].map((s) => (
-              <div key={s.k} className="bg-jm-ink px-5 py-6">
-                <dd className="font-display text-3xl font-semibold text-jm-gold">{s.v}</dd>
+              // Term before definition in the DOM (a <dd> may not precede its
+              // <dt>); reversed visually so the number still reads first.
+              <div key={s.k} className="flex flex-col-reverse bg-jm-ink px-5 py-6">
                 <dt className="mt-1 text-xs uppercase tracking-wider text-jm-muted">{s.k}</dt>
+                <dd className="font-display text-3xl font-semibold text-jm-gold">{s.v}</dd>
               </div>
             ))}
           </dl>
@@ -111,7 +113,7 @@ export default function Home() {
               </h2>
             </div>
             <Link href="/explore" className="text-sm text-jm-gold hover:text-jm-gold-soft">
-              Open the explorer →
+              Open the explorer <span aria-hidden>→</span>
             </Link>
           </div>
 
@@ -184,7 +186,7 @@ export default function Home() {
                 href="/ethics"
                 className="mt-6 inline-block text-sm text-jm-gold hover:text-jm-gold-soft"
               >
-                Read the ethical foundations →
+                Read the ethical foundations <span aria-hidden>→</span>
               </Link>
             </div>
             <ul className="grid gap-px self-start overflow-hidden rounded-xl border border-jm-line bg-jm-line sm:grid-cols-2">

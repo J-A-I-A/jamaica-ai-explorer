@@ -106,29 +106,35 @@ export default function Explorer() {
             <div className="relative mt-2">
               <input
                 id="q"
+                type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                aria-describedby="result-count"
                 placeholder="e.g. curriculum, data centre…"
-                className="w-full rounded-md border border-jm-line bg-jm-black px-3 py-2 pr-8 text-sm text-jm-text placeholder:text-jm-muted/60"
+                className="w-full rounded-md border border-jm-field bg-jm-black px-3 py-2 pr-8 text-sm text-jm-text placeholder:text-jm-muted"
               />
               {query && (
                 <button
+                  type="button"
                   onClick={() => setQuery("")}
                   aria-label="Clear search"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-jm-muted hover:text-jm-text"
+                  className="absolute right-2 top-1/2 grid h-6 w-6 -translate-y-1/2 place-items-center rounded text-jm-muted hover:text-jm-text"
                 >
-                  ×
+                  <span aria-hidden>×</span>
                 </button>
               )}
             </div>
 
-            <p className="mt-6 text-[11px] uppercase tracking-[0.18em] text-jm-gold">Horizon</p>
-            <div className="mt-2 flex flex-col gap-1.5">
+            <p id="filter-horizon" className="mt-6 text-[11px] uppercase tracking-[0.18em] text-jm-gold">
+              Horizon
+            </p>
+            <div role="group" aria-labelledby="filter-horizon" className="mt-2 flex flex-col gap-1.5">
               {HORIZON_KEYS.map((h) => {
                 const on = horizons.includes(h);
                 return (
                   <button
                     key={h}
+                    type="button"
                     onClick={() => toggleHorizon(h)}
                     aria-pressed={on}
                     className={`flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors ${
@@ -136,19 +142,22 @@ export default function Explorer() {
                     }`}
                   >
                     <span>{HORIZONS[h].label}</span>
-                    <span className="text-xs opacity-70">{HORIZONS[h].range}</span>
+                    <span className="text-xs">{HORIZONS[h].range}</span>
                   </button>
                 );
               })}
             </div>
 
-            <p className="mt-6 text-[11px] uppercase tracking-[0.18em] text-jm-gold">Pillar</p>
-            <div className="mt-2 flex flex-col gap-1">
+            <p id="filter-pillar" className="mt-6 text-[11px] uppercase tracking-[0.18em] text-jm-gold">
+              Pillar
+            </p>
+            <div role="group" aria-labelledby="filter-pillar" className="mt-2 flex flex-col gap-1">
               {PILLARS.map((p) => {
                 const on = pillars.includes(p.id);
                 return (
                   <button
                     key={p.id}
+                    type="button"
                     onClick={() => togglePillar(p.id)}
                     aria-pressed={on}
                     className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors ${
@@ -166,8 +175,9 @@ export default function Explorer() {
 
             {isFiltered && (
               <button
+                type="button"
                 onClick={reset}
-                className="mt-6 w-full rounded-md border border-jm-line px-3 py-2 text-sm text-jm-muted hover:border-jm-gold/50 hover:text-jm-text"
+                className="mt-6 w-full rounded-md border border-jm-field px-3 py-2 text-sm text-jm-muted hover:border-jm-gold hover:text-jm-text"
               >
                 Reset filters
               </button>
@@ -178,14 +188,23 @@ export default function Explorer() {
         {/* Results */}
         <div>
           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-jm-line pb-4">
-            <p className="text-sm text-jm-muted">
+            <p
+              id="result-count"
+              aria-live="polite"
+              aria-atomic="true"
+              className="text-sm text-jm-muted"
+            >
               <span className="font-display text-2xl font-semibold text-jm-text">
                 {filtered.length}
               </span>{" "}
               recommendation{filtered.length === 1 ? "" : "s"}
               {isFiltered && ` of ${ALL_ACTIONS.length}`}
             </p>
-            <div className="flex rounded-md border border-jm-line p-0.5">
+            <div
+              role="group"
+              aria-label="Result layout"
+              className="flex rounded-md border border-jm-field p-0.5"
+            >
               {(
                 [
                   ["byPillar", "By pillar"],
@@ -194,6 +213,8 @@ export default function Explorer() {
               ).map(([v, label]) => (
                 <button
                   key={v}
+                  type="button"
+                  aria-pressed={view === v}
                   onClick={() => setView(v)}
                   className={`rounded px-3 py-1.5 text-xs transition-colors ${
                     view === v ? "bg-jm-gold text-jm-black" : "text-jm-muted hover:text-jm-text"
@@ -208,7 +229,7 @@ export default function Explorer() {
           {filtered.length === 0 && (
             <div className="mt-16 text-center">
               <p className="font-display text-xl">No recommendations match those filters.</p>
-              <button onClick={reset} className="mt-4 text-sm text-jm-gold hover:text-jm-gold-soft">
+              <button type="button" onClick={reset} className="mt-4 text-sm text-jm-gold hover:text-jm-gold-soft">
                 Reset and start over
               </button>
             </div>
@@ -217,18 +238,20 @@ export default function Explorer() {
           {view === "byPillar" && (
             <div className="mt-8 space-y-10">
               {grouped.map(({ pillar, actions }) => (
-                <section key={pillar.id} className="fade-up">
+                <section key={pillar.id} aria-labelledby={`pillar-${pillar.id}`} className="fade-up">
                   <div className="flex items-start gap-4">
                     <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-jm-line bg-jm-ink text-jm-gold">
                       <PillarIcon path={pillar.icon} className="h-5 w-5" />
                     </span>
                     <div className="min-w-0">
-                      <Link
-                        href={`/explore/${pillar.slug}`}
-                        className="font-display text-xl font-semibold tracking-tight hover:text-jm-gold"
-                      >
-                        {String(pillar.id).padStart(2, "0")} — {pillar.title}
-                      </Link>
+                      <h2 id={`pillar-${pillar.id}`} className="font-display text-xl font-semibold tracking-tight">
+                        <Link
+                          href={`/explore/${pillar.slug}`}
+                          className="hover:text-jm-gold"
+                        >
+                          {String(pillar.id).padStart(2, "0")} — {pillar.title}
+                        </Link>
+                      </h2>
                       <p className="mt-1 text-sm leading-relaxed text-jm-muted">
                         {highlight(pillar.objective, query)}
                       </p>

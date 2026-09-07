@@ -35,7 +35,7 @@ export default function PillarPicker({
 
   return (
     <div className="rounded-xl border border-jm-line bg-jm-ink p-6 sm:p-8">
-      <h2 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
+      <h2 id="pillar-picker-heading" className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
         Which parts of the policy do you want to weigh in on?
       </h2>
       <p className="mt-3 text-sm leading-relaxed text-jm-muted">
@@ -45,7 +45,11 @@ export default function PillarPicker({
         you have one, and skip anything you&apos;d rather not answer.
       </p>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+      <div
+        role="group"
+        aria-labelledby="pillar-picker-heading"
+        className="mt-6 grid gap-3 sm:grid-cols-2"
+      >
         {PILLARS.map((p) => {
           const on = selected.includes(p.id);
           return (
@@ -86,7 +90,7 @@ export default function PillarPicker({
                 <span className="mt-1.5 block text-xs leading-relaxed text-jm-muted">
                   {p.objective}
                 </span>
-                <span className="mt-2 block text-[11px] uppercase tracking-[0.16em] text-jm-muted/80">
+                <span className="mt-2 block text-[11px] uppercase tracking-[0.16em] text-jm-muted">
                   {p.actions.length} recommendation
                   {p.actions.length === 1 ? "" : "s"}
                 </span>

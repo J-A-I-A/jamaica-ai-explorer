@@ -34,12 +34,13 @@ export default function SwotBoard() {
 
   return (
     <div className="mx-auto max-w-7xl px-5 py-12 sm:px-8">
-      <div className="flex flex-wrap gap-2">
+      <div role="group" aria-label="Filter SWOT categories" className="flex flex-wrap gap-2">
         {KEYS.map((k) => {
           const on = active === k;
           return (
             <button
               key={k}
+              type="button"
               onClick={() => setActive(on ? null : k)}
               aria-pressed={on}
               className={`rounded-full border px-4 py-1.5 text-sm transition-colors ${
@@ -47,12 +48,16 @@ export default function SwotBoard() {
               }`}
             >
               {SWOT[k].label}
-              <span className="ml-2 text-xs opacity-60">{SWOT[k].items.length}</span>
+              <span className="ml-2 text-xs">
+                {SWOT[k].items.length}
+                <span className="sr-only"> items</span>
+              </span>
             </button>
           );
         })}
         {active && (
           <button
+            type="button"
             onClick={() => setActive(null)}
             className="rounded-full px-3 py-1.5 text-sm text-jm-muted hover:text-jm-text"
           >
@@ -67,15 +72,17 @@ export default function SwotBoard() {
         {shown.map((k) => (
           <section
             key={k}
+            aria-labelledby={`swot-${k}`}
             className={`fade-up rounded-xl border bg-jm-ink p-6 ${accent[k].ring}`}
           >
             <div className="flex items-center gap-3">
-              <span className={`h-2 w-2 rounded-full ${accent[k].dot}`} />
-              <h2 className="font-display text-xl font-semibold tracking-tight">
+              <span className={`h-2 w-2 rounded-full ${accent[k].dot}`} aria-hidden />
+              <h2 id={`swot-${k}`} className="font-display text-xl font-semibold tracking-tight">
                 {SWOT[k].label}
               </h2>
               <span className="ml-auto font-display text-sm text-jm-muted">
                 {SWOT[k].items.length}
+                <span className="sr-only"> items</span>
               </span>
             </div>
             <ul className={`mt-5 space-y-5 ${active ? "sm:columns-2 sm:gap-8 sm:space-y-0" : ""}`}>

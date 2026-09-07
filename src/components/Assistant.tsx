@@ -21,9 +21,13 @@ export default function Assistant() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Honour a reduced-motion preference rather than always animating.
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     scrollRef.current?.scrollTo({
       top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
+      behavior: reduce ? "auto" : "smooth",
     });
   }, [messages, streaming]);
 
@@ -82,6 +86,10 @@ export default function Assistant() {
     <div className="flex flex-col overflow-hidden rounded-xl border border-jm-line bg-jm-ink">
       <div
         ref={scrollRef}
+        role="log"
+        aria-label="Conversation"
+        aria-busy={streaming}
+        tabIndex={0}
         className="h-[min(60vh,520px)] overflow-y-auto px-5 py-6 sm:px-6"
       >
         {empty ? (
@@ -99,7 +107,14 @@ export default function Assistant() {
               Recommendations — the nine pillars, the action plan, the SWOT
               analysis, or the ethical foundations.
             </p>
-            <div className="mt-6 grid gap-2 sm:grid-cols-2">
+            <div
+              role="group"
+              aria-labelledby="assistant-starters"
+              className="mt-6 grid gap-2 sm:grid-cols-2"
+            >
+              <span id="assistant-starters" className="sr-only">
+                Suggested questions
+              </span>
               {STARTERS.map((q) => (
                 <button
                   key={q}
@@ -131,11 +146,13 @@ export default function Assistant() {
         )}
       </div>
 
-      {error && (
-        <div className="border-t border-jm-line/70 bg-jm-black/40 px-5 py-3 text-sm text-jm-gold-soft sm:px-6">
-          {error}
-        </div>
-      )}
+      <div aria-live="assertive" role="alert">
+        {error && (
+          <div className="border-t border-jm-line/70 bg-jm-black/40 px-5 py-3 text-sm text-jm-gold-soft sm:px-6">
+            {error}
+          </div>
+        )}
+      </div>
 
       <form
         onSubmit={(e) => {
@@ -144,7 +161,12 @@ export default function Assistant() {
         }}
         className="flex items-end gap-2 border-t border-jm-line/70 bg-jm-black/40 p-3 sm:p-4"
       >
+        <label htmlFor="assistant-input" className="sr-only">
+          Ask a question about the report
+        </label>
         <textarea
+          id="assistant-input"
+          aria-describedby="assistant-disclaimer"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -155,7 +177,7 @@ export default function Assistant() {
           }}
           rows={1}
           placeholder="Ask a question about the report…"
-          className="max-h-40 min-h-[44px] flex-1 resize-none rounded-lg border border-jm-line bg-jm-ink px-3 py-2.5 text-sm text-jm-text placeholder:text-jm-muted/60 focus:border-jm-gold/50"
+          className="max-h-40 min-h-[44px] flex-1 resize-none rounded-lg border border-jm-field bg-jm-ink px-3 py-2.5 text-sm text-jm-text placeholder:text-jm-muted focus:border-jm-gold"
         />
         <button
           type="submit"
@@ -168,7 +190,10 @@ export default function Assistant() {
           </svg>
         </button>
       </form>
-      <p className="border-t border-jm-line/70 px-4 py-2 text-center text-[11px] text-jm-muted">
+      <p
+        id="assistant-disclaimer"
+        className="border-t border-jm-line/70 px-4 py-2 text-center text-[11px] text-jm-muted"
+      >
         A.I. responses are generated from the report and may contain mistakes —
         verify important details against the full document.
       </p>
@@ -188,6 +213,9 @@ function ChatBubble({
   const isUser = role === "user";
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+      {/* Left/right alignment and colour are the only visual cue to who is
+          speaking, neither of which reaches a screen reader. */}
+      <span className="sr-only">{isUser ? "You said:" : "Assistant said:"}</span>
       <div
         className={`max-w-[85%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
           isUser
@@ -196,7 +224,7 @@ function ChatBubble({
         }`}
       >
         {pending ? (
-          <span className="inline-flex items-center gap-2 py-1 text-jm-muted" aria-label="Thinking">
+          <span className="inline-flex items-center gap-2 py-1 text-jm-muted" role="status">
             <span className="inline-flex gap-1">
               <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-jm-muted [animation-delay:-0.3s]" />
               <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-jm-muted [animation-delay:-0.15s]" />

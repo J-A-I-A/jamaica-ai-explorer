@@ -46,8 +46,20 @@ export default function RootLayout({
         className="min-h-full flex flex-col font-sans antialiased"
         suppressHydrationWarning
       >
+        {/* First thing in the tab order: lets keyboard and switch users jump
+            past the header nav on every page (WCAG 2.4.1). */}
+        <a
+          href="#main-content"
+          className="sr-only-focusable absolute left-4 top-4 z-[100] rounded-md bg-jm-gold px-4 py-2 text-sm font-semibold text-jm-black"
+        >
+          Skip to main content
+        </a>
         <SiteHeader />
-        <main className="flex-1">{children}</main>
+        {/* tabIndex -1 so the skip link can actually move focus here, not just
+            scroll to it. */}
+        <main id="main-content" tabIndex={-1} className="focus-target flex-1">
+          {children}
+        </main>
         <FeedbackCta />
         <SiteFooter />
       </body>

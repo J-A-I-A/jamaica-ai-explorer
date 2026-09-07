@@ -36,7 +36,7 @@ export default async function PillarPage({ params }: Props) {
       <div className="border-b border-jm-line/70 bg-jm-ink">
         <div className="mx-auto max-w-5xl px-5 py-14 sm:px-8 sm:py-20">
           <Link href="/explore" className="text-sm text-jm-muted hover:text-jm-gold">
-            ← All recommendations
+            <span aria-hidden>← </span>All recommendations
           </Link>
           <div className="mt-8 flex items-start gap-5">
             <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-jm-line bg-jm-black text-jm-gold">
@@ -68,7 +68,7 @@ export default async function PillarPage({ params }: Props) {
           <ul className="mt-5 grid gap-px overflow-hidden rounded-xl border border-jm-line bg-jm-line sm:grid-cols-2">
             {pillar.challenges.map((c) => (
               <li key={c} className="flex gap-3 bg-jm-ink px-5 py-4 text-sm leading-relaxed">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-jm-gold" />
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-jm-gold" aria-hidden />
                 <span className="text-jm-muted">{c}</span>
               </li>
             ))}
@@ -103,10 +103,10 @@ export default async function PillarPage({ params }: Props) {
           </div>
         </section>
 
-        <nav className="mt-16 grid gap-px overflow-hidden rounded-xl border border-jm-line bg-jm-line sm:grid-cols-2">
+        <nav aria-label="Pillar" className="mt-16 grid gap-px overflow-hidden rounded-xl border border-jm-line bg-jm-line sm:grid-cols-2">
           {prev ? (
             <Link href={`/explore/${prev.slug}`} className="group bg-jm-ink p-5 hover:bg-jm-panel">
-              <p className="text-xs text-jm-muted">← Previous pillar</p>
+              <p className="text-xs text-jm-muted"><span aria-hidden>← </span>Previous pillar</p>
               <p className="mt-1 font-display font-semibold group-hover:text-jm-gold">
                 {prev.title}
               </p>
@@ -119,7 +119,7 @@ export default async function PillarPage({ params }: Props) {
               href={`/explore/${next.slug}`}
               className="group bg-jm-ink p-5 text-right hover:bg-jm-panel"
             >
-              <p className="text-xs text-jm-muted">Next pillar →</p>
+              <p className="text-xs text-jm-muted">Next pillar<span aria-hidden> →</span></p>
               <p className="mt-1 font-display font-semibold group-hover:text-jm-gold">
                 {next.title}
               </p>
