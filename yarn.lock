@@ -3230,7 +3230,7 @@ __metadata:
     eslint: "npm:^9"
     eslint-config-next: "npm:16.2.11"
     next: "npm:16.2.11"
-    openai: "npm:^6.49.0"
+    openai: "npm:^7.10.0"
     pg: "npm:^8.13.0"
     react: "npm:19.2.4"
     react-dom: "npm:19.2.4"
@@ -4325,14 +4325,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"openai@npm:^6.49.0":
-  version: 6.49.0
-  resolution: "openai@npm:6.49.0"
+"openai@npm:^7.10.0":
+  version: 7.10.0
+  resolution: "openai@npm:7.10.0"
   peerDependencies:
     "@aws-sdk/credential-provider-node": ">=3.972.0 <4"
     "@smithy/hash-node": ">=4.3.0 <5"
     "@smithy/signature-v4": ">=5.4.0 <6"
-    ws: ^8.18.0
+    undici: ">=5 <9"
+    ws: ^8.21.0
     zod: ^3.25 || ^4.0
   peerDependenciesMeta:
     "@aws-sdk/credential-provider-node":
@@ -4341,11 +4342,13 @@ __metadata:
       optional: true
     "@smithy/signature-v4":
       optional: true
+    undici:
+      optional: true
     ws:
       optional: true
     zod:
       optional: true
-  checksum: 10c0/c9e748e8a813f948ed925949e857d758505d246d7ec7e939f79cc2ab3383083ccdefff953479afb9dcb0f634cfddb0d442fcf02b6203cc9d6b7c95d3ddbc20ef
+  checksum: 10c0/9a61a4dcd6a22e22cee3a239752de448091fcb8ec0ceafe5a4d3cb223f207520b7ea529977edd95961cd20f3cb5986d2220d948d526aa0314734384cc51ef3c0
   languageName: node
   linkType: hard
 

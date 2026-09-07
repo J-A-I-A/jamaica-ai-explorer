@@ -7,8 +7,8 @@ COPY package.json .yarnrc.yml ./
 RUN yarn install
 COPY . .
 
-ARG NEXT_PUBLIC_RECAPTCHA_SITE_KEY=""
-ENV NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+# No build arguments: every configuration value this app needs is read from the
+# environment at runtime, so one image can be promoted across environments.
 RUN yarn build
 
 FROM node:22-alpine AS runner
@@ -22,6 +22,7 @@ ENV MODEL_API_KEY="" \
 	MODEL_MAX_TOKENS="4096" \
 	CHAT_RATE_LIMIT="15" \
 	CHAT_RATE_WINDOW_HOURS="24" \
+	RECAPTCHA_SITE_KEY="" \
 	RECAPTCHA_SECRET_KEY="" \
 	POSTGRES_URL="" \
 	POSTGRES_USER="" \

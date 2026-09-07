@@ -1,5 +1,3 @@
-import { promises as fs } from "fs";
-import path from "path";
 import { randomUUID } from "crypto";
 import { isIP } from "net";
 import {
@@ -20,7 +18,7 @@ import {
   type FeedbackRatingRecord,
 } from "@/lib/db";
 
-// Needs the Node.js runtime to write to the filesystem.
+// Needs the Node.js runtime for `pg` and `crypto`.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -40,7 +38,14 @@ function normaliseTopics(raw: unknown): string[] {
   return topics.length > 0 ? topics : ["General"];
 }
 
-// --- reCAPTCHA v2 verification (enforced only when a secret is configured) ---
+// --- reCAPTCHA v2 verification ---------------------------------------------
+
+/** Outside development a missing secret is a deployment fault, not a reason to
+ *  accept unverified submissions: the form would take bot traffic with nothing
+ *  in the logs to say so. Development still runs without one, loudly. */
+const RECAPTCHA_REQUIRED = process.env.NODE_ENV === "production";
+
+let warnedNoSecret = false;
 
 /** The one endpoint this route ever talks to. A fixed constant: no part of a
  *  request contributes to the URL, so a posted value can't redirect the call at
@@ -54,10 +59,34 @@ const RECAPTCHA_TOKEN = /^[A-Za-z0-9._~=-]{20,4000}$/;
 
 async function verifyRecaptcha(token: string, remoteIp?: string) {
   const secret = process.env.RECAPTCHA_SECRET_KEY;
-  if (!secret) return { ok: true as const }; // not configured — skip
+  if (!secret) {
+    if (RECAPTCHA_REQUIRED) {
+      console.error(
+        "RECAPTCHA_SECRET_KEY is not set — refusing feedback submissions. " +
+          "Set it in the runtime environment to accept feedback.",
+      );
+      return {
+        ok: false as const,
+        status: 503,
+        error: "Feedback isn't available right now. Please try again later.",
+      };
+    }
+    if (!warnedNoSecret) {
+      warnedNoSecret = true;
+      console.warn(
+        "RECAPTCHA_SECRET_KEY is not set — submissions are accepted without " +
+          "bot protection. This is allowed in development only.",
+      );
+    }
+    return { ok: true as const };
+  }
 
   if (!RECAPTCHA_TOKEN.test(token)) {
-    return { ok: false as const, error: "Please complete the reCAPTCHA challenge." };
+    return {
+      ok: false as const,
+      status: 400,
+      error: "Please complete the reCAPTCHA challenge.",
+    };
   }
   try {
     const params = new URLSearchParams({ secret, response: token });
@@ -71,12 +100,20 @@ async function verifyRecaptcha(token: string, remoteIp?: string) {
     });
     const data = (await res.json()) as { success?: boolean };
     if (!data.success) {
-      return { ok: false as const, error: "reCAPTCHA verification failed. Please try again." };
+      return {
+        ok: false as const,
+        status: 400,
+        error: "reCAPTCHA verification failed. Please try again.",
+      };
     }
     return { ok: true as const };
   } catch (err) {
     console.error("reCAPTCHA verify error:", err);
-    return { ok: false as const, error: "Couldn't verify reCAPTCHA. Please try again." };
+    return {
+      ok: false as const,
+      status: 502,
+      error: "Couldn't verify reCAPTCHA. Please try again.",
+    };
   }
 }
 
@@ -84,6 +121,19 @@ export async function POST(req: Request) {
   if (!FEEDBACK_SUBMISSIONS_OPEN) {
     return Response.json(
       { error: "Feedback isn't open just yet. Please check back shortly." },
+      { status: 503 },
+    );
+  }
+
+  // Checked before the body is even read, so a 503 here is the truth: with no
+  // database configured there is nowhere to put a submission, and nothing the
+  // respondent sent is retained.
+  if (!isDatabaseConfigured()) {
+    console.error(
+      "POSTGRES_URL is not configured — rejecting feedback submission.",
+    );
+    return Response.json(
+      { error: "Feedback storage isn't configured. Please try again later." },
       { status: 503 },
     );
   }
@@ -178,7 +228,7 @@ export async function POST(req: Request) {
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined;
   const captcha = await verifyRecaptcha(str(b.recaptchaToken, 4000), ip);
   if (!captcha.ok) {
-    return Response.json({ error: captcha.error }, { status: 400 });
+    return Response.json({ error: captcha.error }, { status: captcha.status });
   }
 
   // One record per piece of feedback, tied together by a submission id so a
@@ -221,31 +271,10 @@ export async function POST(req: Request) {
     comment: r.comment,
   }));
 
-  // Local backup log (best-effort — never blocks the submission).
-  try {
-    const dir = path.join(process.cwd(), ".data");
-    await fs.mkdir(dir, { recursive: true });
-    const lines = [
-      ...entries.map((e) => JSON.stringify({ kind: "entry", ...e })),
-      ...ratingRecords.map((r) => JSON.stringify({ kind: "rating", ...r })),
-    ];
-    await fs.appendFile(
-      path.join(dir, "feedback.jsonl"),
-      lines.join("\n") + "\n",
-      "utf8",
-    );
-  } catch (err) {
-    console.error("Failed to write local feedback backup:", err);
-  }
-
-  // Postgres is the system of record. The whole submission goes in one
+  // Postgres is the only place a submission is ever written — there is no
+  // local file fallback, so nothing a respondent types is persisted in
+  // plaintext on the container's filesystem. The whole submission goes in one
   // transaction; if that fails, nothing was stored, so ask the user to retry.
-  if (!isDatabaseConfigured()) {
-    return Response.json(
-      { error: "Feedback storage isn't configured. Please try again later." },
-      { status: 503 },
-    );
-  }
   try {
     await saveFeedback({ entries, ratings: ratingRecords });
   } catch (err) {

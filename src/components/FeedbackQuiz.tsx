@@ -59,7 +59,10 @@ type Draft = {
   personName: string;
 };
 
-export default function FeedbackQuiz() {
+/** `siteKey` is the reCAPTCHA v2 site key, read from the environment at request
+ *  time by the page (a Server Component) so the same build can be deployed with
+ *  a different key. Undefined leaves the widget off. */
+export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
   const [stage, setStage] = useState<Stage>("pick");
   const [selected, setSelected] = useState<number[]>([]);
   const [stepIndex, setStepIndex] = useState(0);
@@ -82,7 +85,7 @@ export default function FeedbackQuiz() {
     active: captchaActive,
     token: captchaToken,
     reset: resetCaptcha,
-  } = useRecaptcha(stage === "general");
+  } = useRecaptcha(siteKey, stage === "general");
 
   const steps = useMemo<Step[]>(() => {
     const out: Step[] = [];

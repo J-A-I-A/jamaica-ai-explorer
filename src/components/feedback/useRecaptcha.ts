@@ -3,8 +3,6 @@
 import { useEffect, useRef } from "react";
 import { FEEDBACK_SUBMISSIONS_OPEN } from "@/data/feedback";
 
-export const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-
 declare global {
   interface Window {
     grecaptcha?: {
@@ -19,15 +17,20 @@ declare global {
  * Loads and renders the reCAPTCHA v2 checkbox into `wrapRef`, matching the
  * site theme and re-rendering when the user toggles light/dark.
  *
+ * The site key is passed in rather than read from `process.env` here: a
+ * `NEXT_PUBLIC_*` read is inlined into the client bundle at build time, which
+ * would tie the key to the image instead of the environment it runs in. A
+ * Server Component reads it at request time and hands it down.
+ *
  * The widget only mounts once a site key is configured and submissions are
  * open; `token()` returns null until the visitor has passed the challenge.
  */
-export function useRecaptcha(enabled = true) {
+export function useRecaptcha(siteKey?: string, enabled = true) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const widgetId = useRef<number | null>(null);
   const tokenRef = useRef<string | null>(null);
 
-  const active = Boolean(RECAPTCHA_SITE_KEY) && FEEDBACK_SUBMISSIONS_OPEN && enabled;
+  const active = Boolean(siteKey) && FEEDBACK_SUBMISSIONS_OPEN && enabled;
 
   useEffect(() => {
     if (!active) return;
@@ -46,7 +49,7 @@ export function useRecaptcha(enabled = true) {
       const host = document.createElement("div");
       wrapRef.current.appendChild(host);
       widgetId.current = window.grecaptcha.render(host, {
-        sitekey: RECAPTCHA_SITE_KEY,
+        sitekey: siteKey,
         theme: themeNow(),
         size: "normal",
         callback: (t: string) => {
@@ -105,7 +108,7 @@ export function useRecaptcha(enabled = true) {
       widgetId.current = null;
       tokenRef.current = null;
     };
-  }, [active]);
+  }, [active, siteKey]);
 
   function reset() {
     try {

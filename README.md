@@ -17,6 +17,36 @@ Production build:
 yarn run build && yarn start
 ```
 
+## Configuration
+
+Every setting is read from the environment **at runtime**. Nothing is inlined at
+build time, so a single Docker image can be built once and promoted across
+environments by changing environment variables alone — no rebuild, no republish.
+Copy `.env.example` to `.env.local` for local development.
+
+| Variable | Used by | Notes |
+| --- | --- | --- |
+| `MODEL_API_KEY` / `OPENAI_BASE_URL` / `MODEL` | `/api/chat` | Any OpenAI-compatible endpoint. Absent, the assistant returns 503. |
+| `RECAPTCHA_SITE_KEY` | `/feedback` | Public reCAPTCHA v2 site key. Read server-side and passed to the form as a prop. Absent, the checkbox is not rendered. |
+| `RECAPTCHA_SECRET_KEY` | `/api/feedback` | Server-side verification secret. **Absent in production, the API logs an error and refuses submissions**; in development it warns and accepts them. |
+| `POSTGRES_URL` (+ `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_SSL`) | `/api/feedback` | The only place feedback is ever stored. Absent, the API refuses submissions up front — nothing is written anywhere. |
+
+Set `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` together. With only the
+secret set the form has no checkbox to complete and every submission is
+rejected; with only the site key set, production refuses submissions anyway.
+
+### Why `RECAPTCHA_SITE_KEY` has no `NEXT_PUBLIC_` prefix
+
+Next.js substitutes `NEXT_PUBLIC_*` variables into the client bundle when the
+app is compiled, which would pin the reCAPTCHA key to the image and force a
+rebuild to rotate it. Instead `src/app/feedback/page.tsx` is a Server Component
+that reads `process.env.RECAPTCHA_SITE_KEY` per request and hands it to
+`<FeedbackQuiz siteKey={...} />`. The page is marked `force-dynamic` so it is
+never prerendered with a build-time value.
+
+The site key is public by design — it is visible in the rendered page, as it has
+to be. Only `RECAPTCHA_SECRET_KEY` is a secret.
+
 ## Routes
 
 | Route | What it does |
