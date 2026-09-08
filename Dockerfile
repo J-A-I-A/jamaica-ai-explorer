@@ -2,9 +2,15 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare yarn@4.9.2 --activate
-COPY package.json .yarnrc.yml ./
-RUN yarn install
+# The Yarn release is committed to .yarn/releases and pointed at by yarnPath in
+# .yarnrc.yml, so the version here is whatever the repo is pinned to — corepack
+# only needs to provide the shim that hands off to it.
+RUN corepack enable
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn/releases ./.yarn/releases
+# --immutable: build on the committed lockfile and fail if it is out of date,
+# rather than silently resolving different transitive versions than local.
+RUN yarn install --immutable
 COPY . .
 
 # No build arguments: every configuration value this app needs is read from the
