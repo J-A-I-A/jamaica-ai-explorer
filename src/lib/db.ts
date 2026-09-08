@@ -23,9 +23,17 @@ export type FeedbackRecord = {
   entryCount: number;
   createdAt: string;
   respondentType: string;
-  /** Optional attribution, only ever set for an organisation respondent. */
+  /** Optional attribution. An organisation always names itself; an individual
+   *  may leave every one of these blank. */
   orgName: string | null;
   personName: string | null;
+  /** Individual respondents only — null for an organisation. */
+  ageRange: string | null;
+  employmentStatus: string | null;
+  aiFamiliarity: string | null;
+  /** Organisation respondents only — null for an individual. */
+  orgType: string | null;
+  industry: string | null;
   topic: string;
   topics: string[];
   message: string;
@@ -41,9 +49,17 @@ export type FeedbackRatingRecord = {
   submissionId: string;
   createdAt: string;
   respondentType: string;
-  /** Optional attribution, only ever set for an organisation respondent. */
+  /** Optional attribution. An organisation always names itself; an individual
+   *  may leave every one of these blank. */
   orgName: string | null;
   personName: string | null;
+  /** Individual respondents only — null for an organisation. */
+  ageRange: string | null;
+  employmentStatus: string | null;
+  aiFamiliarity: string | null;
+  /** Organisation respondents only — null for an individual. */
+  orgType: string | null;
+  industry: string | null;
   pillarId: number;
   pillarTitle: string;
   actionId: string;
@@ -127,6 +143,11 @@ const CREATE_TABLE_SQL = `
     respondent_type text        NOT NULL,
     org_name        text,
     person_name     text,
+    age_range           text,
+    employment_status   text,
+    ai_familiarity      text,
+    org_type            text,
+    industry            text,
     topic           text        NOT NULL,
     topics          text[]      NOT NULL,
     message         text        NOT NULL,
@@ -146,6 +167,11 @@ const CREATE_TABLE_SQL = `
     respondent_type text        NOT NULL,
     org_name        text,
     person_name     text,
+    age_range           text,
+    employment_status   text,
+    ai_familiarity      text,
+    org_type            text,
+    industry            text,
     pillar_id       integer     NOT NULL,
     pillar_title    text        NOT NULL,
     action_id       text        NOT NULL,
@@ -167,12 +193,22 @@ const CREATE_TABLE_SQL = `
   CREATE INDEX IF NOT EXISTS feedback_ratings_created_at_idx
     ON feedback_ratings (created_at DESC);
 
-  -- Optional attribution, added after the first release: bring tables created
-  -- by an earlier deploy up to the current shape.
-  ALTER TABLE feedback_entries ADD COLUMN IF NOT EXISTS org_name    text;
-  ALTER TABLE feedback_entries ADD COLUMN IF NOT EXISTS person_name text;
-  ALTER TABLE feedback_ratings ADD COLUMN IF NOT EXISTS org_name    text;
-  ALTER TABLE feedback_ratings ADD COLUMN IF NOT EXISTS person_name text;
+  -- Respondent details, added after the first release: bring tables created by
+  -- an earlier deploy up to the current shape.
+  ALTER TABLE feedback_entries ADD COLUMN IF NOT EXISTS org_name          text;
+  ALTER TABLE feedback_entries ADD COLUMN IF NOT EXISTS person_name       text;
+  ALTER TABLE feedback_entries ADD COLUMN IF NOT EXISTS age_range         text;
+  ALTER TABLE feedback_entries ADD COLUMN IF NOT EXISTS employment_status text;
+  ALTER TABLE feedback_entries ADD COLUMN IF NOT EXISTS ai_familiarity    text;
+  ALTER TABLE feedback_entries ADD COLUMN IF NOT EXISTS org_type          text;
+  ALTER TABLE feedback_entries ADD COLUMN IF NOT EXISTS industry          text;
+  ALTER TABLE feedback_ratings ADD COLUMN IF NOT EXISTS org_name          text;
+  ALTER TABLE feedback_ratings ADD COLUMN IF NOT EXISTS person_name       text;
+  ALTER TABLE feedback_ratings ADD COLUMN IF NOT EXISTS age_range         text;
+  ALTER TABLE feedback_ratings ADD COLUMN IF NOT EXISTS employment_status text;
+  ALTER TABLE feedback_ratings ADD COLUMN IF NOT EXISTS ai_familiarity    text;
+  ALTER TABLE feedback_ratings ADD COLUMN IF NOT EXISTS org_type          text;
+  ALTER TABLE feedback_ratings ADD COLUMN IF NOT EXISTS industry          text;
 `;
 
 let schemaReady: Promise<void> | null = null;
@@ -216,8 +252,10 @@ export async function saveFeedback({
         `INSERT INTO feedback_entries (
            id, submission_id, entry_index, entry_count, created_at,
            respondent_type, org_name, person_name,
+           age_range, employment_status, ai_familiarity, org_type, industry,
            topic, topics, message, policy_step, policy_stage
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                   $14, $15, $16, $17, $18)
          ON CONFLICT (id) DO NOTHING`,
         [
           e.id,
@@ -228,6 +266,11 @@ export async function saveFeedback({
           e.respondentType,
           e.orgName,
           e.personName,
+          e.ageRange,
+          e.employmentStatus,
+          e.aiFamiliarity,
+          e.orgType,
+          e.industry,
           e.topic,
           e.topics,
           e.message,
@@ -240,9 +283,11 @@ export async function saveFeedback({
       await client.query(
         `INSERT INTO feedback_ratings (
            id, submission_id, created_at, respondent_type, org_name, person_name,
+           age_range, employment_status, ai_familiarity, org_type, industry,
            pillar_id, pillar_title, action_id, action_horizon, action_text,
            support, support_score, skipped, comment, policy_step, policy_stage
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                   $15, $16, $17, $18, $19, $20, $21, $22)
          ON CONFLICT (submission_id, action_id) DO NOTHING`,
         [
           r.id,
@@ -251,6 +296,11 @@ export async function saveFeedback({
           r.respondentType,
           r.orgName,
           r.personName,
+          r.ageRange,
+          r.employmentStatus,
+          r.aiFamiliarity,
+          r.orgType,
+          r.industry,
           r.pillarId,
           r.pillarTitle,
           r.actionId,

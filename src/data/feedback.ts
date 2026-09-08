@@ -31,9 +31,93 @@ export const RESPONDENT_TYPES = ["Individual", "Organisation / Company"] as cons
 
 export type RespondentType = (typeof RESPONDENT_TYPES)[number];
 
-/** The respondent type that unlocks the optional attribution fields. Shared so
- *  the form and the API agree on which answer counts as an organisation. */
+/** The respondent type that unlocks the organisation fields. Shared so the
+ *  form and the API agree on which answer counts as an organisation. */
 export const ORGANISATION_TYPE = RESPONDENT_TYPES[1];
+
+/**
+ * The "no answer" value for every optional profile dropdown below. Stored as
+ * an empty string rather than a label so a respondent who declines is
+ * indistinguishable from one who never saw the question — both land as NULL
+ * in the database.
+ */
+export const UNSPECIFIED = "";
+
+/** Rough age band. Bands, not birth years: enough to see who is being heard
+ *  from without collecting a date of birth. */
+export const AGE_RANGES = [
+  "Under 18",
+  "18–24",
+  "25–34",
+  "35–44",
+  "45–54",
+  "55–64",
+  "65 or over",
+] as const;
+
+/** What the respondent does. Broad enough that most people find themselves in
+ *  one entry without a free-text box to moderate. */
+export const EMPLOYMENT_STATUSES = [
+  "Student",
+  "Employed — private sector",
+  "Employed — public sector",
+  "Self-employed / business owner",
+  "Unemployed / seeking work",
+  "Retired",
+  "Not currently working",
+] as const;
+
+/** How close the respondent is to A.I. in practice — the answer that tells us
+ *  how to read the rest of their submission. */
+export const AI_FAMILIARITY_LEVELS = [
+  "I have never used A.I. tools",
+  "I have heard of A.I. but rarely use it",
+  "I use A.I. tools occasionally",
+  "I use A.I. tools regularly",
+  "I work in or study A.I. or technology",
+] as const;
+
+/** What kind of body is answering. */
+export const ORGANISATION_TYPES = [
+  "Private company",
+  "Non-profit / NGO",
+  "Government agency or ministry",
+  "Statutory body / public agency",
+  "Academic or research institution",
+  "Industry association or trade body",
+  "International or multilateral body",
+  "Faith-based organisation",
+  "Community group",
+  "Other",
+] as const;
+
+/** Sector the organisation works in. */
+export const INDUSTRY_SECTORS = [
+  "Agriculture & Fisheries",
+  "Banking, Finance & Insurance",
+  "Construction & Real Estate",
+  "Creative Industries & Entertainment",
+  "Education & Training",
+  "Energy & Utilities",
+  "Health & Life Sciences",
+  "Hospitality & Tourism",
+  "Information Technology & Telecommunications",
+  "Legal & Professional Services",
+  "Manufacturing",
+  "Media & Communications",
+  "Mining & Extractives",
+  "Public Sector & Government",
+  "Retail & Distribution",
+  "Security & Defence",
+  "Transport & Logistics",
+  "Other",
+] as const;
+
+export type AgeRange = (typeof AGE_RANGES)[number];
+export type EmploymentStatus = (typeof EMPLOYMENT_STATUSES)[number];
+export type AiFamiliarity = (typeof AI_FAMILIARITY_LEVELS)[number];
+export type OrganisationCategory = (typeof ORGANISATION_TYPES)[number];
+export type IndustrySector = (typeof INDUSTRY_SECTORS)[number];
 
 /** How many separate pieces of feedback one submission may carry. */
 export const MAX_FEEDBACK_ENTRIES = 10;
@@ -42,8 +126,10 @@ export const FEEDBACK_LIMITS = {
   message: 5000,
   /** Per-recommendation comment in the guided review. */
   comment: 1500,
-  /** Optional organisation and contact names. */
+  /** Organisation and contact names. */
   name: 160,
+  /** Any single-choice profile answer (age band, sector, and the rest). */
+  choice: 120,
 };
 
 /**

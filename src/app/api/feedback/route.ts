@@ -1,12 +1,17 @@
 import { randomUUID } from "crypto";
 import { isIP } from "net";
 import {
+  AGE_RANGES,
+  AI_FAMILIARITY_LEVELS,
+  EMPLOYMENT_STATUSES,
   FEEDBACK_TOPICS,
   FEEDBACK_LIMITS as LIMITS,
   FEEDBACK_SUBMISSIONS_OPEN,
+  INDUSTRY_SECTORS,
   MAX_FEEDBACK_ENTRIES,
   MAX_FEEDBACK_RATINGS,
   ORGANISATION_TYPE,
+  ORGANISATION_TYPES,
   RESPONDENT_TYPES,
   SUPPORT_BY_VALUE,
 } from "@/data/feedback";
@@ -28,6 +33,14 @@ const ACTIONS_BY_ID = new Map(ALL_ACTIONS.map((a) => [a.id, a]));
 
 function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
+}
+
+/** Single-choice profile answers are only ever stored when they match one of
+ *  the options the form offered; anything else (including a blank "prefer not
+ *  to say") becomes NULL, so the columns stay analysable. */
+function choice(v: unknown, allowed: readonly string[]): string | null {
+  const value = str(v, LIMITS.choice);
+  return allowed.includes(value) ? value : null;
 }
 
 /** Keep only known topics, de-duplicated and in the canonical order. */
@@ -217,11 +230,28 @@ export async function POST(req: Request) {
     ? rawType
     : RESPONDENT_TYPES[0];
 
-  // Attribution is optional and only meaningful for an organisation, so an
-  // individual's submission can never carry a name even if one is posted.
+  // An organisation must name itself; an individual may stay anonymous, and
+  // the fields belonging to the other respondent type are dropped rather than
+  // stored, even if a client posts them.
   const isOrg = respondentType === ORGANISATION_TYPE;
-  const orgName = isOrg ? str(b.orgName, LIMITS.name) || null : null;
-  const personName = isOrg ? str(b.personName, LIMITS.name) || null : null;
+  const orgName = isOrg ? str(b.orgName, LIMITS.name) : "";
+  if (isOrg && !orgName) {
+    return Response.json(
+      { error: "Please give the name of the organisation you're responding for." },
+      { status: 400 },
+    );
+  }
+  const personName = str(b.personName, LIMITS.name) || null;
+
+  const ageRange = isOrg ? null : choice(b.ageRange, AGE_RANGES);
+  const employmentStatus = isOrg
+    ? null
+    : choice(b.employmentStatus, EMPLOYMENT_STATUSES);
+  const aiFamiliarity = isOrg
+    ? null
+    : choice(b.aiFamiliarity, AI_FAMILIARITY_LEVELS);
+  const orgType = isOrg ? choice(b.orgType, ORGANISATION_TYPES) : null;
+  const industry = isOrg ? choice(b.industry, INDUSTRY_SECTORS) : null;
 
   // Verify reCAPTCHA before doing anything else.
   const ip =
@@ -240,8 +270,13 @@ export async function POST(req: Request) {
     submissionId,
     createdAt,
     respondentType,
-    orgName,
+    orgName: orgName || null,
     personName,
+    ageRange,
+    employmentStatus,
+    aiFamiliarity,
+    orgType,
+    industry,
     policyStep: CURRENT_POLICY_STEP,
     policyStage: currentPolicyStep.title,
   };

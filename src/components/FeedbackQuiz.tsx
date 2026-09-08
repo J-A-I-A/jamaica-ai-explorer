@@ -9,10 +9,7 @@ import {
   type Action,
 } from "@/data/recommendations";
 import {
-  FEEDBACK_LIMITS,
   FEEDBACK_SUBMISSIONS_OPEN,
-  ORGANISATION_TYPE,
-  RESPONDENT_TYPES,
   SUPPORT_LEVELS,
 } from "@/data/feedback";
 import { CURRENT_POLICY_STEP, currentPolicyStep } from "@/data/policyTimeline";
@@ -28,8 +25,14 @@ import GeneralComments, {
   newEntry,
   type Entry,
 } from "@/components/feedback/GeneralComments";
+import RespondentDetails, {
+  emptyProfile,
+  isOrganisation,
+  profileIsComplete,
+  ORG_NAME_FIELD_ID,
+  type Profile,
+} from "@/components/feedback/RespondentDetails";
 import { useRecaptcha } from "@/components/feedback/useRecaptcha";
-import { fieldClass } from "@/components/feedback/styles";
 
 /** Recommendations grouped by pillar, keeping the canonical ids from the data
  *  module so a stored answer always points at the same recommendation. */
@@ -47,17 +50,38 @@ type Answers = Record<string, Answer>;
 
 const DRAFT_KEY = "jaia-feedback-draft-v1";
 
+/** v1 drafts predate the respondent profile: they carry the three attribution
+ *  fields at the top level and nothing else about the respondent. */
 type Draft = {
-  v: 1;
+  v: 2;
   stage: Stage;
   selected: number[];
   stepIndex: number;
   answers: Answers;
   entries: { topics: string[]; message: string }[];
-  respondentType: string;
-  orgName: string;
-  personName: string;
+  profile: Profile;
 };
+
+type StoredDraft = Draft | (Omit<Draft, "v" | "profile"> & {
+  v: 1;
+  respondentType?: string;
+  orgName?: string;
+  personName?: string;
+});
+
+/** Read the respondent profile out of a draft of either version. */
+function draftProfile(d: StoredDraft): Profile {
+  const base = emptyProfile();
+  if (d.v === 1) {
+    return {
+      ...base,
+      respondentType: d.respondentType ?? base.respondentType,
+      orgName: d.orgName ?? "",
+      personName: d.personName ?? "",
+    };
+  }
+  return { ...base, ...(d.profile ?? {}) };
+}
 
 /** `siteKey` is the reCAPTCHA v2 site key, read from the environment at request
  *  time by the page (a Server Component) so the same build can be deployed with
@@ -68,11 +92,8 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
   const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState<Answers>({});
   const [entries, setEntries] = useState<Entry[]>(() => [newEntry()]);
-  const [respondentType, setRespondentType] = useState<string>(
-    RESPONDENT_TYPES[0],
-  );
-  const [orgName, setOrgName] = useState("");
-  const [personName, setPersonName] = useState("");
+  const [profile, setProfile] = useState<Profile>(emptyProfile);
+  const [showProfileErrors, setShowProfileErrors] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [restored, setRestored] = useState(false);
@@ -114,8 +135,8 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
-        const d = JSON.parse(raw) as Draft;
-        if (d?.v === 1 && d.stage !== "done") {
+        const d = JSON.parse(raw) as StoredDraft;
+        if ((d?.v === 1 || d?.v === 2) && d.stage !== "done") {
           // A draft is only as trustworthy as the storage it came from, so the
           // pillar ids and position are re-checked against the current policy.
           const ids = (Array.isArray(d.selected) ? d.selected : []).filter(
@@ -130,9 +151,7 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
           setSelected(ids);
           setStepIndex(Math.min(Math.max(at, 0), Math.max(stepCount - 1, 0)));
           setAnswers(d.answers ?? {});
-          setRespondentType(d.respondentType ?? RESPONDENT_TYPES[0]);
-          setOrgName(d.orgName ?? "");
-          setPersonName(d.personName ?? "");
+          setProfile(draftProfile(d));
           // Re-key the entries so ids stay unique against this session's counter.
           const list = (d.entries ?? []).map((e) => ({
             ...newEntry(),
@@ -159,20 +178,18 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
       return;
     }
     const draft: Draft = {
-      v: 1,
+      v: 2,
       stage,
       selected,
       stepIndex,
       answers,
       entries: entries.map((e) => ({ topics: e.topics, message: e.message })),
-      respondentType,
-      orgName,
-      personName,
+      profile,
     };
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch {}
-  }, [stage, selected, stepIndex, answers, entries, respondentType, orgName, personName]);
+  }, [stage, selected, stepIndex, answers, entries, profile]);
 
   function startOver() {
     try {
@@ -183,9 +200,8 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
     setStepIndex(0);
     setAnswers({});
     setEntries([newEntry()]);
-    setRespondentType(RESPONDENT_TYPES[0]);
-    setOrgName("");
-    setPersonName("");
+    setProfile(emptyProfile());
+    setShowProfileErrors(false);
     setRestored(false);
     setStatus("idle");
     setError(null);
@@ -319,7 +335,8 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
     (s) => answerHasContent(answers[s.action.id]) || answers[s.action.id]?.skipped,
   ).length;
 
-  const isOrganisation = respondentType === ORGANISATION_TYPE;
+  const org = isOrganisation(profile);
+  const profileComplete = profileIsComplete(profile);
 
   const contentEntries = entries.filter(entryHasContent);
   const entriesValid = contentEntries.every((e) => e.topics.length > 0);
@@ -331,6 +348,11 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!profileComplete) {
+      setShowProfileErrors(true);
+      document.getElementById(ORG_NAME_FIELD_ID)?.focus();
+      return;
+    }
     if (!canSubmit) return;
 
     if (captchaActive && !captchaToken()) {
@@ -346,9 +368,14 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          respondentType,
-          orgName: isOrganisation ? orgName : "",
-          personName: isOrganisation ? personName : "",
+          respondentType: profile.respondentType,
+          orgName: org ? profile.orgName : "",
+          personName: profile.personName,
+          ageRange: org ? "" : profile.ageRange,
+          employmentStatus: org ? "" : profile.employmentStatus,
+          aiFamiliarity: org ? "" : profile.aiFamiliarity,
+          orgType: org ? profile.orgType : "",
+          industry: org ? profile.industry : "",
           ratings: ratingsPayload,
           entries: contentEntries.map((en) => ({
             topics: en.topics,
@@ -595,67 +622,14 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
           )}
 
           <div className="mt-6">
-            <label className="block sm:max-w-sm">
-              <span className="text-sm text-jm-text">
-                I&apos;m sharing this feedback as
-              </span>
-              <select
-                value={respondentType}
-                onChange={(e) => setRespondentType(e.target.value)}
-                className={`mt-2 ${fieldClass}`}
-              >
-                {RESPONDENT_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {isOrganisation ? (
-              <div className="fade-up mt-4 rounded-xl border border-jm-line bg-jm-black/40 p-5">
-                <p className="text-sm text-jm-text">
-                  Who should this be attributed to?
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-jm-muted">
-                  Both fields are optional — leave them blank and your
-                  submission stays anonymous.
-                </p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="text-sm text-jm-text">
-                      Organisation name
-                    </span>
-                    <input
-                      type="text"
-                      value={orgName}
-                      onChange={(e) => setOrgName(e.target.value)}
-                      maxLength={FEEDBACK_LIMITS.name}
-                      autoComplete="organization"
-                      placeholder="e.g. Jamaica Chamber of Commerce"
-                      className={`mt-2 ${fieldClass}`}
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-sm text-jm-text">Your name</span>
-                    <input
-                      type="text"
-                      value={personName}
-                      onChange={(e) => setPersonName(e.target.value)}
-                      maxLength={FEEDBACK_LIMITS.name}
-                      autoComplete="name"
-                      placeholder="Who is filling this in"
-                      className={`mt-2 ${fieldClass}`}
-                    />
-                  </label>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-2 text-xs text-jm-muted sm:max-w-sm">
-                No personal details are collected — your feedback is submitted
-                anonymously.
-              </p>
-            )}
+            <RespondentDetails
+              profile={profile}
+              onChange={(patch) => {
+                setProfile((prev) => ({ ...prev, ...patch }));
+                setShowProfileErrors(false);
+              }}
+              showErrors={showProfileErrors}
+            />
           </div>
 
           <div className="mt-8 border-t border-jm-line pt-6">
@@ -682,6 +656,11 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
           )}
 
           <div role="alert" aria-live="assertive">
+            {showProfileErrors && !profileComplete && (
+              <p className="mt-4 text-sm text-jm-gold-soft">
+                Please give your organisation&apos;s name before submitting.
+              </p>
+            )}
             {status === "error" && error && (
               <p className="mt-4 text-sm text-jm-gold-soft">{error}</p>
             )}
