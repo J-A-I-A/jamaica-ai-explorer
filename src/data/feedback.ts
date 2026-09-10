@@ -18,12 +18,11 @@ export const FEEDBACK_TOPICS = [
 
 export type FeedbackTopic = (typeof FEEDBACK_TOPICS)[number];
 
-/**
- * Master switch for accepting submissions. While this is `false` the form
- * still renders (so people can read it) but the submit button is disabled and
- * the API rejects posts. Flip to `true` to open feedback.
- */
-export const FEEDBACK_SUBMISSIONS_OPEN: boolean = false;
+// The master switch for accepting submissions used to live here as a constant.
+// It is now read from the environment by `feedbackSubmissionsOpen()` in
+// `src/lib/feedbackConfig.ts`, so opening or closing the consultation is a
+// restart rather than a rebuild — and it reaches the form as a prop, because
+// this module is imported by client components.
 
 /** Who is speaking. An individual is asked for nothing else; an organisation
  *  may optionally name itself and the person filling the form in. */

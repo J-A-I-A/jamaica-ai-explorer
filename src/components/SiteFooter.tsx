@@ -70,7 +70,13 @@ export default function SiteFooter() {
               <span className="sr-only"> (opens in a new tab)</span>
             </a>
           </span>
-          <span>Aligned with Vision 2030 Jamaica.</span>
+          <span className="flex items-center gap-3">
+            <Link className="hover:text-jm-text" href="/privacy">
+              Privacy Policy
+            </Link>
+            <span aria-hidden className="text-jm-line">|</span>
+            <span>Aligned with Vision 2030 Jamaica.</span>
+          </span>
         </div>
       </div>
     </footer>

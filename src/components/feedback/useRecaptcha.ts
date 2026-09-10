@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { FEEDBACK_SUBMISSIONS_OPEN } from "@/data/feedback";
 
 declare global {
   interface Window {
@@ -22,15 +21,16 @@ declare global {
  * would tie the key to the image instead of the environment it runs in. A
  * Server Component reads it at request time and hands it down.
  *
- * The widget only mounts once a site key is configured and submissions are
- * open; `token()` returns null until the visitor has passed the challenge.
+ * The widget only mounts when `enabled` says so — the caller folds in whether
+ * submissions are open and whether the visitor has reached the final step;
+ * `token()` returns null until the visitor has passed the challenge.
  */
 export function useRecaptcha(siteKey?: string, enabled = true) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const widgetId = useRef<number | null>(null);
   const tokenRef = useRef<string | null>(null);
 
-  const active = Boolean(siteKey) && FEEDBACK_SUBMISSIONS_OPEN && enabled;
+  const active = Boolean(siteKey) && enabled;
 
   useEffect(() => {
     if (!active) return;

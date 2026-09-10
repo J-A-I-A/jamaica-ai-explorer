@@ -3,6 +3,8 @@ import { ASSISTANT_SYSTEM_PROMPT } from "@/data/documentContext";
 import {
   checkRateLimit,
   clientKey,
+  describeWait,
+  numberFromEnv,
   rateLimitHeaders,
   recordHit,
 } from "@/lib/rateLimit";
@@ -31,25 +33,12 @@ const MODEL = process.env.MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
 // reasoning before the visible answer, so give a generous ceiling.
 const MAX_OUTPUT_TOKENS = Number(process.env.MODEL_MAX_TOKENS) || 4096;
 
-function numberFromEnv(raw: string | undefined, fallback: number): number {
-  const value = Number(raw?.trim());
-  return raw?.trim() && Number.isFinite(value) && value >= 0 ? value : fallback;
-}
-
 // How many questions one visitor can have answered in a rolling window.
 // CHAT_RATE_LIMIT=0 turns the limit off entirely.
 // An unset or blank value keeps the default; an explicit 0 disables the limit.
 const RATE_LIMIT = numberFromEnv(process.env.CHAT_RATE_LIMIT, 15);
 const RATE_WINDOW_HOURS = numberFromEnv(process.env.CHAT_RATE_WINDOW_HOURS, 24) || 24;
 const RATE_WINDOW_MS = RATE_WINDOW_HOURS * 60 * 60 * 1000;
-
-/** "in about 3 hours" / "in about 25 minutes", for the limit message. */
-function describeWait(seconds: number): string {
-  const hours = Math.round(seconds / 3600);
-  if (hours >= 1) return `in about ${hours} hour${hours === 1 ? "" : "s"}`;
-  const minutes = Math.max(1, Math.round(seconds / 60));
-  return `in about ${minutes} minute${minutes === 1 ? "" : "s"}`;
-}
 
 function sanitize(messages: unknown): IncomingMessage[] | null {
   if (!Array.isArray(messages)) return null;
@@ -77,7 +66,7 @@ export async function POST(req: Request) {
   // Cap how many answers one visitor can pull from the model per window.
   // Checked (not spent) up front — a question only costs a slot once the
   // model has actually accepted it below.
-  const limitKey = clientKey(req);
+  const limitKey = clientKey(req, "chat");
   const limited = RATE_LIMIT > 0;
   if (limited) {
     const state = checkRateLimit(limitKey, RATE_LIMIT, RATE_WINDOW_MS);

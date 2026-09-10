@@ -13,7 +13,11 @@ const STARTERS = [
   "What are Jamaica's main A.I. opportunities and threats?",
 ];
 
-export default function Assistant() {
+/** `privacyNotice` is the short line shown under the composer, read from the
+ *  environment at request time by the page so the wording — and the processor it
+ *  names — can be changed per deployment without a rebuild. Absent, no notice is
+ *  rendered. */
+export default function Assistant({ privacyNotice }: { privacyNotice?: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -166,7 +170,11 @@ export default function Assistant() {
         </label>
         <textarea
           id="assistant-input"
-          aria-describedby="assistant-disclaimer"
+          aria-describedby={
+            privacyNotice
+              ? "assistant-disclaimer assistant-privacy"
+              : "assistant-disclaimer"
+          }
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -190,13 +198,17 @@ export default function Assistant() {
           </svg>
         </button>
       </form>
-      <p
-        id="assistant-disclaimer"
-        className="border-t border-jm-line/70 px-4 py-2 text-center text-[11px] text-jm-muted"
-      >
-        A.I. responses are generated from the report and may contain mistakes —
-        verify important details against the full document.
-      </p>
+      <div className="border-t border-jm-line/70 px-4 py-2 text-center text-[11px] leading-relaxed text-jm-muted">
+        <p id="assistant-disclaimer">
+          A.I. responses are generated from the report and may contain mistakes —
+          verify important details against the full document.
+        </p>
+        {privacyNotice && (
+          <p id="assistant-privacy" className="mt-1">
+            {privacyNotice}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

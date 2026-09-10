@@ -6,7 +6,6 @@ import {
   EMPLOYMENT_STATUSES,
   FEEDBACK_TOPICS,
   FEEDBACK_LIMITS as LIMITS,
-  FEEDBACK_SUBMISSIONS_OPEN,
   INDUSTRY_SECTORS,
   MAX_FEEDBACK_ENTRIES,
   MAX_FEEDBACK_RATINGS,
@@ -22,6 +21,15 @@ import {
   saveFeedback,
   type FeedbackRatingRecord,
 } from "@/lib/db";
+import { feedbackSubmissionsOpen } from "@/lib/feedbackConfig";
+import {
+  checkRateLimit,
+  clientKey,
+  describeWait,
+  numberFromEnv,
+  rateLimitHeaders,
+  recordHit,
+} from "@/lib/rateLimit";
 
 // Needs the Node.js runtime for `pg` and `crypto`.
 export const runtime = "nodejs";
@@ -30,6 +38,24 @@ export const dynamic = "force-dynamic";
 /** Recommendations keyed by id, so a posted rating can only ever refer to a
  *  recommendation that actually exists in the policy. */
 const ACTIONS_BY_ID = new Map(ALL_ACTIONS.map((a) => [a.id, a]));
+
+// --- rate limiting ----------------------------------------------------------
+
+/** How many submissions one address can send in a rolling window.
+ *  FEEDBACK_RATE_LIMIT=0 turns the limit off entirely; an unset or blank value
+ *  keeps the default. The default is deliberately generous, because a whole
+ *  office, campus or ISP can share one address in a public consultation — it is
+ *  here to stop a script flooding the consultation, not to ration honest
+ *  respondents, who are also held to the reCAPTCHA check. */
+const RATE_LIMIT = numberFromEnv(process.env.FEEDBACK_RATE_LIMIT, 10);
+const RATE_WINDOW_HOURS =
+  numberFromEnv(process.env.FEEDBACK_RATE_WINDOW_HOURS, 1) || 1;
+const RATE_WINDOW_MS = RATE_WINDOW_HOURS * 60 * 60 * 1000;
+const RATE_LIMITED = RATE_LIMIT > 0;
+
+/** "per hour" / "per 6 hours", for the limit message. */
+const RATE_WINDOW_LABEL =
+  RATE_WINDOW_HOURS === 1 ? "per hour" : `per ${RATE_WINDOW_HOURS} hours`;
 
 function str(v: unknown, max: number): string {
   return typeof v === "string" ? v.trim().slice(0, max) : "";
@@ -131,7 +157,30 @@ async function verifyRecaptcha(token: string, remoteIp?: string) {
 }
 
 export async function POST(req: Request) {
-  if (!FEEDBACK_SUBMISSIONS_OPEN) {
+  // Checked before the body is read, so a flood costs this process almost
+  // nothing. A slot is only spent further down, once a submission is complete
+  // enough to be worth a reCAPTCHA call and a database write — a respondent
+  // who trips a validation error keeps their full budget.
+  const limitKey = clientKey(req, "feedback");
+  if (RATE_LIMITED) {
+    const state = checkRateLimit(limitKey, RATE_LIMIT, RATE_WINDOW_MS);
+    if (!state.allowed) {
+      return Response.json(
+        {
+          error: `You've reached the limit of ${RATE_LIMIT} submissions ${RATE_WINDOW_LABEL}. Please try again ${describeWait(state.retryAfterSeconds)}.`,
+        },
+        {
+          status: 429,
+          headers: {
+            ...rateLimitHeaders(state),
+            "Retry-After": String(state.retryAfterSeconds),
+          },
+        },
+      );
+    }
+  }
+
+  if (!feedbackSubmissionsOpen()) {
     return Response.json(
       { error: "Feedback isn't open just yet. Please check back shortly." },
       { status: 503 },
@@ -253,12 +302,24 @@ export async function POST(req: Request) {
   const orgType = isOrg ? choice(b.orgType, ORGANISATION_TYPES) : null;
   const industry = isOrg ? choice(b.industry, INDUSTRY_SECTORS) : null;
 
+  // The payload is well-formed and about to cost an outbound reCAPTCHA call and
+  // a database write, so this is where a slot is spent — charged whether or not
+  // the token turns out to be valid, so a bot posting junk tokens can't keep
+  // Google's siteverify endpoint busy for free.
+  const limit = RATE_LIMITED
+    ? recordHit(limitKey, RATE_LIMIT, RATE_WINDOW_MS)
+    : null;
+  const limitHeaders = limit ? rateLimitHeaders(limit) : undefined;
+
   // Verify reCAPTCHA before doing anything else.
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined;
   const captcha = await verifyRecaptcha(str(b.recaptchaToken, 4000), ip);
   if (!captcha.ok) {
-    return Response.json({ error: captcha.error }, { status: captcha.status });
+    return Response.json(
+      { error: captcha.error },
+      { status: captcha.status, headers: limitHeaders },
+    );
   }
 
   // One record per piece of feedback, tied together by a submission id so a
@@ -316,15 +377,18 @@ export async function POST(req: Request) {
     console.error("Failed to save feedback to Postgres:", err);
     return Response.json(
       { error: "We couldn't save your feedback right now. Please try again." },
-      { status: 502 },
+      { status: 502, headers: limitHeaders },
     );
   }
 
-  return Response.json({
-    ok: true,
-    entries: entries.length,
-    ratings: ratingRecords.length,
-    // Kept for older clients that read `count`.
-    count: entries.length + ratingRecords.length,
-  });
+  return Response.json(
+    {
+      ok: true,
+      entries: entries.length,
+      ratings: ratingRecords.length,
+      // Kept for older clients that read `count`.
+      count: entries.length + ratingRecords.length,
+    },
+    { headers: limitHeaders },
+  );
 }

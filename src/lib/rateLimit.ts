@@ -1,14 +1,15 @@
 import "server-only";
 
 /**
- * In-memory sliding-window rate limiter for the Smart Search assistant.
+ * In-memory sliding-window rate limiter shared by the public API routes.
  *
- * Each client gets N answered questions per rolling window (24h by default).
- * The state lives in the process, cached on globalThis so Next.js dev-server
- * hot reloads don't reset it — which means the budget is per app instance and
- * resets on deploy. That's the right trade-off here: the limit exists to cap
- * model spend and casual abuse, not to be an auditable quota, and it keeps the
- * chat route free of any database dependency.
+ * Each client gets N requests per rolling window, per scope — the Smart Search
+ * assistant and feedback submissions hold separate budgets, so using one never
+ * eats into the other. The state lives in the process, cached on globalThis so
+ * Next.js dev-server hot reloads don't reset it — which means the budget is per
+ * app instance and resets on deploy. That's the right trade-off here: the limit
+ * exists to cap model spend and casual abuse, not to be an auditable quota, and
+ * it keeps the routes free of any extra database dependency.
  */
 
 /** Hits are recorded as timestamps, so the window slides instead of resetting
@@ -113,17 +114,19 @@ export function recordHit(
 }
 
 /**
- * Identify the caller. Behind a proxy the first x-forwarded-for entry is the
- * client; direct connections fall back to a shared bucket, which is
- * deliberately conservative — an unidentifiable caller shares one budget.
+ * Identify the caller, within one scope. Behind a proxy the first
+ * x-forwarded-for entry is the client; direct connections fall back to a shared
+ * bucket, which is deliberately conservative — an unidentifiable caller shares
+ * one budget. The scope keeps each route's budget separate, so a visitor who
+ * has used up their questions can still send feedback.
  */
-export function clientKey(req: Request): string {
+export function clientKey(req: Request, scope: string): string {
   const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const ip =
     forwarded ||
     req.headers.get("x-real-ip")?.trim() ||
     req.headers.get("cf-connecting-ip")?.trim();
-  return ip || "unknown";
+  return `${scope}:${ip || "unknown"}`;
 }
 
 /** Headers that let the client show how much budget is left. */
@@ -133,4 +136,22 @@ export function rateLimitHeaders(state: RateLimitResult): Record<string, string>
     "X-RateLimit-Remaining": String(state.remaining),
     "X-RateLimit-Reset": String(Math.ceil(state.resetAt / 1000)),
   };
+}
+
+/**
+ * Read a non-negative limit or window from the environment. An unset or
+ * unparseable value keeps the caller's default; an explicit 0 is honoured, so a
+ * deployment can turn a limit off without a code change.
+ */
+export function numberFromEnv(raw: string | undefined, fallback: number): number {
+  const value = Number(raw?.trim());
+  return raw?.trim() && Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+/** "in about 3 hours" / "in about 25 minutes", for a limit message. */
+export function describeWait(seconds: number): string {
+  const hours = Math.round(seconds / 3600);
+  if (hours >= 1) return `in about ${hours} hour${hours === 1 ? "" : "s"}`;
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  return `in about ${minutes} minute${minutes === 1 ? "" : "s"}`;
 }

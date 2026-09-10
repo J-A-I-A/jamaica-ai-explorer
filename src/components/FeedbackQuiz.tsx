@@ -9,7 +9,6 @@ import {
   type Action,
 } from "@/data/recommendations";
 import {
-  FEEDBACK_SUBMISSIONS_OPEN,
   SUPPORT_LEVELS,
 } from "@/data/feedback";
 import { CURRENT_POLICY_STEP, currentPolicyStep } from "@/data/policyTimeline";
@@ -83,10 +82,18 @@ function draftProfile(d: StoredDraft): Profile {
   return { ...base, ...(d.profile ?? {}) };
 }
 
-/** `siteKey` is the reCAPTCHA v2 site key, read from the environment at request
+/** `siteKey` is the reCAPTCHA v2 site key and `submissionsOpen` the master
+ *  switch for accepting feedback. Both are read from the environment at request
  *  time by the page (a Server Component) so the same build can be deployed with
- *  a different key. Undefined leaves the widget off. */
-export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
+ *  a different key, and opened or closed, without rebuilding. An undefined
+ *  `siteKey` leaves the widget off. */
+export default function FeedbackQuiz({
+  siteKey,
+  submissionsOpen,
+}: {
+  siteKey?: string;
+  submissionsOpen: boolean;
+}) {
   const [stage, setStage] = useState<Stage>("pick");
   const [selected, setSelected] = useState<number[]>([]);
   const [stepIndex, setStepIndex] = useState(0);
@@ -107,7 +114,7 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
     active: captchaActive,
     token: captchaToken,
     reset: resetCaptcha,
-  } = useRecaptcha(siteKey, stage === "general");
+  } = useRecaptcha(siteKey, submissionsOpen && stage === "general");
 
   const steps = useMemo<Step[]>(() => {
     const out: Step[] = [];
@@ -344,7 +351,7 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
     ratingsPayload.some((r) => r.support || r.comment) || contentEntries.length > 0;
 
   const canSubmit =
-    FEEDBACK_SUBMISSIONS_OPEN && entriesValid && hasSubstance && status !== "sending";
+    submissionsOpen && entriesValid && hasSubstance && status !== "sending";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -673,7 +680,7 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
             </p>
           )}
 
-          {!FEEDBACK_SUBMISSIONS_OPEN && (
+          {!submissionsOpen && (
             <p className="mt-6 rounded-lg border border-jm-line bg-jm-black/40 px-4 py-3 text-sm text-jm-muted">
               Submissions aren&apos;t open just yet — this form is here so you
               can see what will be asked. Please check back shortly.
@@ -695,7 +702,7 @@ export default function FeedbackQuiz({ siteKey }: { siteKey?: string }) {
               aria-describedby={!hasSubstance ? "submit-requirement" : undefined}
               className="shrink-0 rounded-md bg-jm-gold px-5 py-2.5 text-sm font-semibold text-jm-black transition-colors hover:bg-jm-gold-soft disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {!FEEDBACK_SUBMISSIONS_OPEN
+              {!submissionsOpen
                 ? "Feedback opens soon"
                 : status === "sending"
                   ? "Sending…"
