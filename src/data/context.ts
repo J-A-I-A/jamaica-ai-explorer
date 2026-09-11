@@ -154,38 +154,66 @@ export const CHAIR = {
   title: "Chairman",
 };
 
-export const MEMBERS: { name: string; role: string }[] = [
+export type Member = { name: string; role: string };
+
+/**
+ * Serving members of the 2026–2027 Task Force, per the National A.I. Task Force
+ * 2026–2027 members contact register.
+ */
+export const CURRENT_MEMBERS: Member[] = [
   { name: "Adrian Dunkley", role: "CEO, StarApple A.I." },
   { name: "Alexander Causwell", role: "Fellow at the Caribbean Policy Research Institute" },
   { name: "Alok Jain, CD", role: "Senior Advisor to the Prime Minister" },
+  { name: "Christopher Cooke", role: "Ministry of Economic Growth & Job Creation" },
   { name: "Cordel Green", role: "Executive Director, The Broadcasting Commission" },
   {
     name: "Daniel Coore, PhD",
     role: "Professor of Computer Science, Department of Computing, University of the West Indies (Mona)",
   },
   { name: "Danielle Mullings", role: "International Technology, Media and Youth Engagement Consultant" },
-  { name: "Dwayne Russell", role: "General Manager, Management Control Systems (MCS)" },
+  { name: "Denese Palmer", role: "Ministry of Health & Wellness" },
   { name: "Larren Peart", role: "CEO, Bluedot Insights" },
-  { name: "Marjorie Straw", role: "International Development Consultant" },
+  { name: "Matthew Stone", role: "Jamaica A.I. Association (JAIA) / Private Sector" },
+  { name: "Melissa Sanderson", role: "University of Technology, Jamaica" },
+  { name: "Nadeen Matthews Blair", role: "Jamaica A.I. Association (JAIA) / Private Sector" },
+  {
+    name: "Natwaine Gardner, PhD",
+    role: "Office of the Prime Minister / Ministry of Science, Energy, Telecommunications & Transport",
+  },
   {
     name: "Ruth Baker-Gardner, PhD",
     role: "Library & Information Studies, University of the West Indies (Mona)",
   },
+  { name: "Ryan Francis", role: "Scientific Research Council" },
   {
     name: "Sean Thorpe, PhD",
     role: "Professor and Head of School of Computing & Information Technology, University of Technology, Jamaica",
   },
+  { name: "Shawnalee Archibald", role: "Social Development Commission" },
   { name: "Shullette Cox", role: "President, JAMPRO" },
   { name: "Dr. Taneisha Ingleton", role: "Managing Director, HEART/NSTA Trust" },
   { name: "Trevor Forrest", role: "CEO, 876 Technology Solutions" },
+  { name: "Tyrone Anderson", role: "Ministry of Education, Youth & Information" },
   { name: "Wahkeen Murray", role: "Chief Technical Director, ICT Division, OPM" },
   { name: "Yoni Epstein, CD", role: "Chairman & CEO, ITEL International" },
 ];
 
+/**
+ * Members who served on an earlier sitting of the Task Force and contributed to
+ * the policy recommendations, but are not on the 2026–2027 roster.
+ */
+export const FORMER_MEMBERS: Member[] = [
+  { name: "Dwayne Russell", role: "General Manager, Management Control Systems (MCS)" },
+  { name: "Marjorie Straw", role: "International Development Consultant" },
+];
+
+/** Everyone who has served — used where the full contributor list is needed. */
+export const MEMBERS: Member[] = [...CURRENT_MEMBERS, ...FORMER_MEMBERS];
+
 export const REFERENCES: { text: string; href: string }[] = [
   {
-    text: "The Data Protection Act 2020. Jamaica Parliament.",
-    href: "https://japarliament.gov.jm/attachments/article/339/The%20Data%20Protection%20Act,%202020.pdf",
+    text:"Jamaica National Artificial Intelligence Policy Recommendations",
+    href: "https://opm.gov.jm/wp-content/uploads/2025/02/National-Artificial-Intelligence-Task-Force-Policy-Recommendations-Final-1.pdf",
   },
   {
     text: "Planning Institute of Jamaica (2009). Vision 2030 Jamaica: National Development Plan.",
@@ -198,5 +226,9 @@ export const REFERENCES: { text: string; href: string }[] = [
   {
     text: "UNESCO (2022). Recommendation on the Ethics of Artificial Intelligence.",
     href: "https://unesdoc.unesco.org/ark:/48223/pf0000381137",
+  },
+  {
+    text: "The Data Protection Act 2020. Jamaica Parliament.",
+    href: "https://japarliament.gov.jm/attachments/article/339/The%20Data%20Protection%20Act,%202020.pdf",
   },
 ];

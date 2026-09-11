@@ -1,6 +1,6 @@
 import "server-only";
 import { PILLARS, HORIZONS, VISION } from "@/data/recommendations";
-import { SWOT, ETHICS, GLOBAL_THEMES, CHAIR, MEMBERS } from "@/data/context";
+import { SWOT, ETHICS, GLOBAL_THEMES, CHAIR, CURRENT_MEMBERS, FORMER_MEMBERS } from "@/data/context";
 
 /**
  * Builds a compact, structured knowledge base from the report's data so the
@@ -36,7 +36,12 @@ export function buildDocumentContext(): string {
 
   const members = [
     `  Chair — ${CHAIR.name} (${CHAIR.role})`,
-    ...MEMBERS.map((m) => `  - ${m.name} — ${m.role}`),
+    "",
+    "  Current members (2026–2027):",
+    ...CURRENT_MEMBERS.map((m) => `  - ${m.name} — ${m.role}`),
+    "",
+    "  Former members (served on earlier sittings of the Task Force):",
+    ...FORMER_MEMBERS.map((m) => `  - ${m.name} — ${m.role}`),
   ].join("\n");
 
   return [

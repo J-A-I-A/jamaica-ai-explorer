@@ -12,6 +12,10 @@ import "server-only";
  * Markdown from its export endpoint, so no API key, OAuth client or service
  * account is involved — which is the whole reason this is a plain `fetch` and
  * not the Google Docs API.
+ *
+ * Requests are never held open for Google. The copy in memory is served
+ * immediately and refreshed behind the response once it is past its cache
+ * window — see `getPrivacyDoc` for the two cases that still have to wait.
  */
 
 /** The one endpoint this module ever talks to. Built from a fixed template with
@@ -50,15 +54,23 @@ function secondsFromEnv(raw: string | undefined, fallback: number): number {
   return raw?.trim() && Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
-/** How long a fetched copy is served before Google is asked again. Short enough
- *  that an edit shows up while the editor is still at their desk, long enough
- *  that a burst of traffic doesn't turn into a burst of requests to Google. */
+/** How long a fetched copy is served before a refresh is triggered behind the
+ *  next request. Short enough that an edit shows up while the editor is still
+ *  at their desk, long enough that a burst of traffic doesn't turn into a burst
+ *  of requests to Google. Nobody waits for that refresh, so this can be short
+ *  without costing a visitor anything. */
 const CACHE_MS =
   secondsFromEnv(process.env.PRIVACY_DOC_CACHE_SECONDS, 300) * 1000;
 
 /** Google is a third party on the far side of the internet; a hung connection
- *  must not hold a page render open indefinitely. */
+ *  must not hold a refresh open indefinitely. */
 const FETCH_TIMEOUT_MS = 10_000;
+
+/** After a failed refresh, how long to leave Google alone before trying again.
+ *  Refreshes are cheap for the visitor but not for Google, and during an outage
+ *  every request would otherwise start another attempt the moment the last one
+ *  gave up. */
+const RETRY_MS = 30_000;
 
 let warnedUnconfigured = false;
 
@@ -139,11 +151,38 @@ function normalise(raw: string): string {
     .trim();
 }
 
-type Cached = { markdown: string; fetchedAt: number };
+type DocState = {
+  /** The last copy that was successfully read, if there has ever been one. */
+  cached?: { markdown: string; fetchedAt: number };
+  /** When a refresh last finished, successful or not — the floor for retries. */
+  lastAttemptAt: number;
+  /** True when the most recent refresh attempt failed. */
+  failing: boolean;
+  /** The refresh currently running, so concurrent requests share one fetch
+   *  instead of each opening their own connection to Google. */
+  inFlight: Promise<void> | null;
+};
 
-/** Cached on globalThis so a dev-server hot reload doesn't re-fetch on every
- *  edit, matching how the rate limiter holds its state. */
-const globalForDoc = globalThis as unknown as { jaiaPrivacyDoc?: Cached };
+/** Held on globalThis so a dev-server hot reload doesn't re-fetch on every
+ *  edit, matching how the rate limiter holds its state. The key is distinct
+ *  from the one an earlier version used, because the shape changed and a hot
+ *  reload would otherwise hand this code the old object. */
+const globalForDoc = globalThis as unknown as { jaiaPrivacyDocState?: DocState };
+
+function state(): DocState {
+  globalForDoc.jaiaPrivacyDocState ??= {
+    lastAttemptAt: 0,
+    failing: false,
+    inFlight: null,
+  };
+  return globalForDoc.jaiaPrivacyDocState;
+}
+
+/** The copy currently in memory, read through a call so that a refresh
+ *  completing mid-request is visible to the caller. */
+function copy(): DocState["cached"] {
+  return state().cached;
+}
 
 export type PrivacyDoc =
   | {
@@ -155,57 +194,123 @@ export type PrivacyDoc =
   | { ok: false; reason: "unconfigured" | "unavailable" };
 
 /**
- * Fetch the policy, serving a cached copy inside the cache window.
+ * Ask Google for the document. Throws on anything that isn't a usable policy,
+ * so the caller has a single place to decide what a failure means.
+ */
+async function fetchMarkdown(id: string): Promise<string> {
+  const res = await fetch(exportUrl(id), {
+    // Caching is handled above, on our terms, so that a failure can fall back
+    // to the previous copy — something an opaque fetch cache can't do.
+    cache: "no-store",
+    redirect: "follow",
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`Google Docs returned HTTP ${res.status}`);
+
+  // A doc that isn't shared publicly doesn't fail — it redirects to a Google
+  // sign-in page, which arrives as a perfectly healthy 200 full of HTML.
+  // Rendering that as the privacy policy would be worse than showing nothing,
+  // so both the final host and the content type have to check out.
+  // `res.url` is the final URL after any redirects. It is empty only when the
+  // response carries no URL at all, which means there was no redirect to
+  // inspect — falling back to the requested URL keeps this from throwing an
+  // unhelpful "Invalid URL" over what is actually the happy path.
+  const host = new URL(res.url || exportUrl(id)).hostname;
+  const type = res.headers.get("content-type") ?? "";
+  if (!CONTENT_HOST.test(host) || type.includes("text/html")) {
+    throw new Error(
+      "got a sign-in page instead of the document — check that it is shared " +
+        "with 'Anyone with the link' as Viewer",
+    );
+  }
+
+  const markdown = normalise(await res.text());
+  if (!markdown) throw new Error("the document is empty");
+  return markdown;
+}
+
+/**
+ * Start a refresh, or join the one already in flight.
  *
- * On a failed fetch the last good copy is served instead, marked stale. A
+ * This never rejects. A failure is recorded on the state and surfaced through
+ * `stale`, because the common case is a caller that doesn't await it at all —
+ * an unhandled rejection from a background refresh would take the server down
+ * over a Google hiccup.
+ */
+function refresh(id: string): Promise<void> {
+  const s = state();
+  if (s.inFlight) return s.inFlight;
+
+  const run = (async () => {
+    try {
+      const markdown = await fetchMarkdown(id);
+      s.cached = { markdown, fetchedAt: Date.now() };
+      s.failing = false;
+    } catch (err) {
+      console.error("Couldn't load the privacy policy from Google Docs:", err);
+      s.failing = true;
+    } finally {
+      s.lastAttemptAt = Date.now();
+      s.inFlight = null;
+    }
+  })();
+
+  s.inFlight = run;
+  return run;
+}
+
+/**
+ * Return the policy, refreshing behind the response rather than in front of it.
+ *
+ * Once there is a copy in hand every request is served from memory and returns
+ * immediately; when that copy is past the cache window the request also kicks
+ * off a refresh it doesn't wait for, so the new text is there for whoever comes
+ * next. Before this, one visitor every `CACHE_MS` paid for a full round trip to
+ * Google — up to `FETCH_TIMEOUT_MS` of it — to read a document that changes a
+ * few times a year.
+ *
+ * Two cases still wait: the first read after a restart, which has nothing to
+ * serve, and a first read that fails, which has nothing to fall back to. On
+ * every later failure the last good copy is served instead, marked stale. A
  * privacy notice is a statement a public body has made to the public: a Google
  * outage is a poor reason to withdraw it, and yesterday's wording is far better
  * than an error page.
+ *
+ * The background refresh assumes a server that outlives the response, which
+ * `output: "standalone"` gives us. On a platform that freezes the process the
+ * moment a response is sent, the refresh would simply land on the next request
+ * instead — slower, but never wrong.
  */
 export async function getPrivacyDoc(): Promise<PrivacyDoc> {
   const id = privacyDocId();
   if (!id) return { ok: false, reason: "unconfigured" };
 
-  const cached = globalForDoc.jaiaPrivacyDoc;
-  if (cached && Date.now() - cached.fetchedAt < CACHE_MS) {
-    return { ok: true, markdown: cached.markdown, stale: false };
+  const s = state();
+
+  // Nothing cached: this one request has to wait, and joins the refresh that
+  // any concurrent request may already have started. Read back through
+  // `copy()` rather than `s.cached`, so the value a completed refresh just
+  // stored is actually seen — a property narrowed to undefined before the await
+  // stays that way as far as the compiler is concerned.
+  let held = copy();
+  if (!held) {
+    await refresh(id);
+    held = copy();
+    if (!held) return { ok: false, reason: "unavailable" };
+    return { ok: true, markdown: held.markdown, stale: false };
   }
 
-  try {
-    const res = await fetch(exportUrl(id), {
-      // Caching is handled above, on our terms, so that a failure can fall back
-      // to the previous copy — something an opaque fetch cache can't do.
-      cache: "no-store",
-      redirect: "follow",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!res.ok) throw new Error(`Google Docs returned HTTP ${res.status}`);
+  const now = Date.now();
+  const due = now - held.fetchedAt >= CACHE_MS;
+  // While Google is failing, stop trying on every single request — an outage
+  // shouldn't turn steady traffic into a stream of doomed round trips.
+  const mayRetry = !s.failing || now - s.lastAttemptAt >= RETRY_MS;
 
-    // A doc that isn't shared publicly doesn't fail — it redirects to a Google
-    // sign-in page, which arrives as a perfectly healthy 200 full of HTML.
-    // Rendering that as the privacy policy would be worse than showing nothing,
-    // so both the final host and the content type have to check out.
-    // `res.url` is the final URL after any redirects. It is empty only when the
-    // response carries no URL at all, which means there was no redirect to
-    // inspect — falling back to the requested URL keeps this from throwing an
-    // unhelpful "Invalid URL" over what is actually the happy path.
-    const host = new URL(res.url || exportUrl(id)).hostname;
-    const type = res.headers.get("content-type") ?? "";
-    if (!CONTENT_HOST.test(host) || type.includes("text/html")) {
-      throw new Error(
-        "got a sign-in page instead of the document — check that it is shared " +
-          "with 'Anyone with the link' as Viewer",
-      );
-    }
-
-    const markdown = normalise(await res.text());
-    if (!markdown) throw new Error("the document is empty");
-
-    globalForDoc.jaiaPrivacyDoc = { markdown, fetchedAt: Date.now() };
-    return { ok: true, markdown, stale: false };
-  } catch (err) {
-    console.error("Couldn't load the privacy policy from Google Docs:", err);
-    if (cached) return { ok: true, markdown: cached.markdown, stale: true };
-    return { ok: false, reason: "unavailable" };
+  if (due && mayRetry) {
+    // Deliberately not awaited. The visitor gets the copy already in memory;
+    // the fresh one lands in time for the next reader.
+    void refresh(id);
   }
+
+  return { ok: true, markdown: held.markdown, stale: s.failing };
 }
