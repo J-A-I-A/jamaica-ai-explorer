@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import Markdown from "@/components/Markdown";
 
 type Role = "user" | "assistant";
-type Message = { role: Role; content: string };
+/** `sig` is the server's signature on an assistant reply. It is sent back with
+ *  the history so the server can tell its own replies from forged ones. */
+type Message = { role: Role; content: string; sig?: string };
+
+/** Must match SIGNATURE_SEPARATOR in lib/chatSignature (server-only, so it
+ *  can't be imported here). */
+const SIGNATURE_SEPARATOR = "\u001e";
 
 const STARTERS = [
   "What are the nine policy pillars?",
@@ -65,9 +71,12 @@ export default function Assistant({ privacyNotice }: { privacyNotice?: string })
         const { done, value } = await reader.read();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
+        // The reply ends with a separator and its signature; keep both out of
+        // the bubble.
+        const [content, sig] = acc.split(SIGNATURE_SEPARATOR);
         setMessages((m) => {
           const next = [...m];
-          next[next.length - 1] = { role: "assistant", content: acc };
+          next[next.length - 1] = { role: "assistant", content, sig };
           return next;
         });
       }

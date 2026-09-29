@@ -35,6 +35,7 @@ Copy `.env.example` to `.env.local` for local development.
 | `POSTGRES_URL` (+ `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_SSL`) | `/api/feedback` | The only place feedback is ever stored. Absent, the API refuses submissions up front — nothing is written anywhere. |
 | `FEEDBACK_RATE_LIMIT` / `FEEDBACK_RATE_WINDOW_HOURS` | `/api/feedback` | Submissions allowed per address per rolling window. Defaults to 10 per hour; `FEEDBACK_RATE_LIMIT=0` turns the limit off. |
 | `CHAT_RATE_LIMIT` / `CHAT_RATE_WINDOW_HOURS` | `/api/chat` | Questions answered per address per rolling window. Defaults to 15 per 24 hours; `CHAT_RATE_LIMIT=0` turns the limit off. |
+| `CHAT_SIGNING_SECRET` | `/api/chat` | Key for signing assistant replies, so the history a browser sends back can't include forged ones. Unset, each instance makes a random key at startup; set it when more than one instance serves traffic. |
 
 Set `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` together. With only the
 secret set the form has no checkbox to complete and every submission is

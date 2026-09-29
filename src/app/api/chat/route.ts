@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { ASSISTANT_SYSTEM_PROMPT } from "@/data/documentContext";
+import { SIGNATURE_SEPARATOR, signReply, verifyReply } from "@/lib/chatSignature";
 import {
   checkRateLimit,
   clientKey,
@@ -14,7 +15,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Role = "user" | "assistant";
-type IncomingMessage = { role: Role; content: string };
+type ChatMessage = { role: Role; content: string };
 
 const MAX_MESSAGES = 20;
 const MAX_CONTENT_CHARS = 6000;
@@ -40,25 +41,45 @@ const RATE_LIMIT = numberFromEnv(process.env.CHAT_RATE_LIMIT, 15);
 const RATE_WINDOW_HOURS = numberFromEnv(process.env.CHAT_RATE_WINDOW_HOURS, 24) || 24;
 const RATE_WINDOW_MS = RATE_WINDOW_HOURS * 60 * 60 * 1000;
 
-function sanitize(messages: unknown): IncomingMessage[] | null {
+function sanitize(messages: unknown): ChatMessage[] | null {
   if (!Array.isArray(messages)) return null;
-  const cleaned: IncomingMessage[] = [];
+  const cleaned: ChatMessage[] = [];
+  // The question an assistant turn must have been signed against.
+  let question: string | null = null;
   for (const m of messages) {
     if (
       !m ||
       typeof m !== "object" ||
       (m.role !== "user" && m.role !== "assistant") ||
-      typeof m.content !== "string"
+      typeof m.content !== "string" ||
+      (m.sig !== undefined && typeof m.sig !== "string")
     ) {
       return null;
     }
-    const content = m.content.trim().slice(0, MAX_CONTENT_CHARS);
-    if (content.length === 0) continue;
-    cleaned.push({ role: m.role, content });
+    const text = m.content.trim();
+    if (text.length === 0) continue;
+    if (m.role === "user") {
+      const content = text.slice(0, MAX_CONTENT_CHARS);
+      question = content;
+      cleaned.push({ role: "user", content });
+      continue;
+    }
+    // Only replies this server wrote, for the question just before them, are
+    // kept as history; anything else is dropped rather than shown to the model.
+    // Verified before truncation, since the full reply is what was signed.
+    const genuine =
+      question !== null &&
+      typeof m.sig === "string" &&
+      verifyReply(question, text, m.sig);
+    question = null;
+    if (genuine) {
+      cleaned.push({ role: "assistant", content: text.slice(0, MAX_CONTENT_CHARS) });
+    }
   }
   const trimmed = cleaned.slice(-MAX_MESSAGES);
   while (trimmed.length && trimmed[0].role !== "user") trimmed.shift();
-  if (trimmed.length === 0) return null;
+  // The request has to end with the new question.
+  if (trimmed.length === 0 || trimmed[trimmed.length - 1].role !== "user") return null;
   return trimmed;
 }
 
@@ -139,13 +160,25 @@ export async function POST(req: Request) {
     ? recordHit(limitKey, RATE_LIMIT, RATE_WINDOW_MS)
     : null;
 
+  const question = messages[messages.length - 1].content;
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
+        let reply = "";
         for await (const chunk of completion) {
-          const delta = chunk.choices[0]?.delta?.content;
-          if (delta) controller.enqueue(encoder.encode(delta));
+          const delta = chunk.choices[0]?.delta?.content?.replaceAll(SIGNATURE_SEPARATOR, "");
+          if (delta) {
+            reply += delta;
+            controller.enqueue(encoder.encode(delta));
+          }
+        }
+        // Only a reply that finished cleanly is signed, so the client can send
+        // it back as history on the next question. See lib/chatSignature.
+        if (reply.trim()) {
+          controller.enqueue(
+            encoder.encode(SIGNATURE_SEPARATOR + signReply(question, reply)),
+          );
         }
       } catch (err) {
         console.error("Chat stream error:", err);
