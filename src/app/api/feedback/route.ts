@@ -89,12 +89,44 @@ let warnedNoSecret = false;
 /** The one endpoint this route ever talks to. A fixed constant: no part of a
  *  request contributes to the URL, so a posted value can't redirect the call at
  *  an internal host. */
-const RECAPTCHA_VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
+const RECAPTCHA_VERIFY_URL = new URL(
+  "https://www.google.com/recaptcha/api/siteverify",
+);
+
+/** Outbound allowlist. Checked at call time as well, so a later change that
+ *  builds the URL from anything else fails closed instead of reaching an
+ *  internal host. */
+const ALLOWED_OUTBOUND_HOSTS: ReadonlySet<string> = new Set(["www.google.com"]);
+
+function isAllowedOutbound(url: URL): boolean {
+  return url.protocol === "https:" && ALLOWED_OUTBOUND_HOSTS.has(url.hostname);
+}
+
+const RECAPTCHA_TIMEOUT_MS = 5000;
 
 /** Google's tokens are URL-safe base64. Kept deliberately wide — the token only
  *  ever goes into a form-encoded body, so this is a sanity check, and anything
- *  narrower risks turning a real token into a submission the user can't send. */
-const RECAPTCHA_TOKEN = /^[A-Za-z0-9._~=-]{20,4000}$/;
+ *  narrower risks turning a real token into a submission the user can't send.
+ *  A plain length check and character scan rather than a regex: linear by
+ *  construction, so no input can make it backtrack. */
+const RECAPTCHA_TOKEN_MIN = 20;
+const RECAPTCHA_TOKEN_MAX = 4000;
+const RECAPTCHA_TOKEN_CHARS = new Set(
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~=-",
+);
+
+function isPlausibleRecaptchaToken(token: string): boolean {
+  if (
+    token.length < RECAPTCHA_TOKEN_MIN ||
+    token.length > RECAPTCHA_TOKEN_MAX
+  ) {
+    return false;
+  }
+  for (const ch of token) {
+    if (!RECAPTCHA_TOKEN_CHARS.has(ch)) return false;
+  }
+  return true;
+}
 
 async function verifyRecaptcha(token: string, remoteIp?: string) {
   const secret = process.env.RECAPTCHA_SECRET_KEY;
@@ -120,11 +152,19 @@ async function verifyRecaptcha(token: string, remoteIp?: string) {
     return { ok: true as const };
   }
 
-  if (!RECAPTCHA_TOKEN.test(token)) {
+  if (!isPlausibleRecaptchaToken(token)) {
     return {
       ok: false as const,
       status: 400,
       error: "Please complete the reCAPTCHA challenge.",
+    };
+  }
+  if (!isAllowedOutbound(RECAPTCHA_VERIFY_URL)) {
+    console.error("reCAPTCHA verify URL is not on the outbound allowlist.");
+    return {
+      ok: false as const,
+      status: 502,
+      error: "Couldn't verify reCAPTCHA. Please try again.",
     };
   }
   try {
@@ -136,6 +176,9 @@ async function verifyRecaptcha(token: string, remoteIp?: string) {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params,
+      // A redirect would send the request somewhere the allowlist never saw.
+      redirect: "error",
+      signal: AbortSignal.timeout(RECAPTCHA_TIMEOUT_MS),
     });
     const data = (await res.json()) as { success?: boolean };
     if (!data.success) {
