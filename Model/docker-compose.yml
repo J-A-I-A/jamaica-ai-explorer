@@ -2,15 +2,22 @@ name: qwen35
 
 services:
   qwen:
-    image: ghcr.io/ggml-org/llama.cpp:server
+    # Pin LLAMA_IMAGE to a digest in production so restarts cannot change the server version.
+    image: ${LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server}
     container_name: qwen35-0.8b
     restart: unless-stopped
     ports:
-      # Localhost only. Change to "8080:8080" to expose on the LAN (set an API key first).
-      - "127.0.0.1:${PORT:-8080}:8080"
+      # Localhost only by default. Set BIND_ADDRESS=0.0.0.0 to expose it (set API_KEY first).
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8080}:8080"
     environment:
       # GGUF is downloaded from Hugging Face on first start and cached in the volume.
       LLAMA_CACHE: /models
+      # Empty means no authentication. Several keys can be given, comma-separated.
+      LLAMA_API_KEY: ${API_KEY:-}
+      # Set OFFLINE=1 once the model is cached to block all downloads at start-up.
+      LLAMA_ARG_OFFLINE: ${OFFLINE:-0}
+      # Prometheus metrics at /metrics (requires the API key when one is set).
+      LLAMA_ARG_ENDPOINT_METRICS: "1"
     volumes:
       - models:/models
     command:

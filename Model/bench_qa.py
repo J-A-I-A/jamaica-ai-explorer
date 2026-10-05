@@ -19,6 +19,7 @@ Standard library only. Usage:
 """
 import argparse
 import json
+import os
 import re
 import statistics
 import sys
@@ -48,7 +49,7 @@ QUESTIONS = [
 ]
 
 
-def ask(base_url, model, system, question, max_tokens, cache):
+def ask(base_url, model, api_key, system, question, max_tokens, cache):
     body = {
         "model": model,
         "messages": [
@@ -64,7 +65,7 @@ def ask(base_url, model, system, question, max_tokens, cache):
     req = urllib.request.Request(
         f"{base_url}/chat/completions",
         data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json", "Authorization": "Bearer none"},
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
     )
     text, usage, timings, t_first = [], {}, {}, None
     t0 = time.perf_counter()
@@ -106,6 +107,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--base-url", default="http://127.0.0.1:8080/v1")
     ap.add_argument("--model", default="qwen3.5-0.8b")
+    ap.add_argument("--api-key", default=os.environ.get("API_KEY", "none"),
+                    help="defaults to the API_KEY environment variable")
     ap.add_argument("--doc", type=Path, default=DEFAULT_DOC,
                     help="text file used as the system prompt (instructions + report)")
     ap.add_argument("--max-tokens", type=int, default=200)
@@ -126,7 +129,7 @@ def main():
     def run(job):
         t0 = time.perf_counter()
         try:
-            result = ask(args.base_url, args.model, system, job[0], args.max_tokens,
+            result = ask(args.base_url, args.model, args.api_key, system, job[0], args.max_tokens,
                          not args.no_cache)
         except OSError as exc:  # HTTP errors, refused connections, timeouts
             result = {"question": job[0], "answer": "", "error": str(exc),
@@ -173,7 +176,7 @@ def main():
 
     args.out_dir.mkdir(exist_ok=True)
     report = args.out_dir / f"bench_qa_{datetime.now():%Y%m%d_%H%M%S}.json"
-    report.write_text(json.dumps({"args": {k: str(v) for k, v in vars(args).items()},
+    report.write_text(json.dumps({"args": {k: str(v) for k, v in vars(args).items() if k != "api_key"},
                                   "summary": summary, "results": results}, indent=2),
                       encoding="utf-8")
     print(f"\nreport: {report}")
