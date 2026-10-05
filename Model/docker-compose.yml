@@ -1,0 +1,52 @@
+name: qwen35
+
+services:
+  qwen:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: qwen35-0.8b
+    restart: unless-stopped
+    ports:
+      # Localhost only. Change to "8080:8080" to expose on the LAN (set an API key first).
+      - "127.0.0.1:${PORT:-8080}:8080"
+    environment:
+      # GGUF is downloaded from Hugging Face on first start and cached in the volume.
+      LLAMA_CACHE: /models
+    volumes:
+      - models:/models
+    command:
+      - --hf-repo
+      - ${MODEL:-unsloth/Qwen3.5-0.8B-GGUF:UD-Q4_K_XL}
+      - --alias
+      - qwen3.5-0.8b
+      - --port
+      - "8080"
+      - --jinja
+      # Thinking off by default (loop-prone on the 0.8B model). Per request, send
+      # "chat_template_kwargs": {"enable_thinking": true} to turn it on.
+      - --chat-template-kwargs
+      - '{"enable_thinking":false}'
+      # Concurrent request slots. The context is shared across slots, so keep
+      # CTX_SIZE >= PARALLEL x (document + question + answer tokens).
+      - --parallel
+      - "${PARALLEL:-4}"
+      - --ctx-size
+      - "${CTX_SIZE:-32768}"
+      - --threads
+      - "${THREADS:-6}"
+      # CPU only
+      - --n-gpu-layers
+      - "0"
+      # Qwen3.5 recommended defaults for non-thinking text; clients can override per request.
+      - --temp
+      - "1.0"
+      - --top-p
+      - "1.0"
+      - --top-k
+      - "20"
+      - --min-p
+      - "0.0"
+      - --presence-penalty
+      - "2.0"
+
+volumes:
+  models:
