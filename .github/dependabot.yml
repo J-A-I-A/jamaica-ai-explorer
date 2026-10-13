@@ -1,0 +1,36 @@
+# Keeps dependencies current: Dependabot opens PRs for new releases and
+# .github/workflows/ci.yml lints and builds each one before it is merged.
+version: 2
+updates:
+  - package-ecosystem: npm # also handles yarn.lock (Yarn 4)
+    directory: /
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    groups:
+      # next and eslint-config-next must move together.
+      next:
+        patterns: [next, eslint-config-next]
+      react:
+        patterns: [react, react-dom, "@types/react", "@types/react-dom"]
+      # One PR for all other minor/patch bumps instead of one per package.
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # Stay on the Node 22 LTS line; move to the next LTS by hand.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
